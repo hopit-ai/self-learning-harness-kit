@@ -1,0 +1,6 @@
+# Self-served agent (python -m slh serve): the Modal Environment every Modal
+# call targets (SDK environment_name / MODAL_ENVIRONMENT, CLI --env). The
+# owner configured it server-side with Maximum Concurrent Containers = 3 and
+# Maximum Concurrent GPUs = 1; `serve` refuses to start unless it still has a
+# GPU limit of 1 and a container limit of at most 3.
+modal_environment: self-learning-harness

@@ -1,0 +1,26 @@
+# A0 (no learning) with the self-served agent (agent-vllm.yaml). The user
+# simulator and the judge are unchanged (OpenRouter / OpenAI, paid per token).
+#
+# Two caps, both approved by the owner per item:
+# - budget.cap_usd below: token spend of this run (user simulator + judge; the
+#   agent is $0 per token here);
+# - `python -m slh serve start --cap`: the GPU time of the serving session,
+#   reserved per window in serving/<session>/ledger.jsonl.
+# Start the serving window first (python -m slh serve start --out
+# serving/qwen35-9b ...), then run; resume after a window closes with
+# `python -m slh run --resume <run>` once a new window is serving.
+# The A0 baseline on this stack is a new baseline: it does not compare with
+# OpenRouter runs without a paired check (docs/self-served-agent.md).
+agent: agent-vllm.yaml
+user: user.yaml
+budget:
+  cap_usd: 20.00
+prices: prices.yaml
+seed: 300
+grader:
+  judge: official
+orchestrator:
+  max_steps: 200
+  max_errors: 10
+  enforce_communication_protocol: false
+  timeout_s: null

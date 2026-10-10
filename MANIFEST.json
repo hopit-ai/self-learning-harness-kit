@@ -1,0 +1,692 @@
+{
+ "code_snapshot": {
+  "commit": "5470c549fb7732b5eca7b45f1de198665f9427e7",
+  "tree": "d85606726399e2c9d6c983f7bc44b4ca13bfb899"
+ },
+ "files": {
+  ".gitignore": {
+   "bytes": 45,
+   "mode": "644",
+   "sha256": "b33df68600e46a99aee8371055dfdb43ca8c594ae9770ed2db90e47c1ebafad1"
+  },
+  "LICENSE": {
+   "bytes": 1065,
+   "mode": "644",
+   "sha256": "357b5ef4237282cb5bb22990b406ed626c17892b8fd95cb59b984c8c0a8c4a5f"
+  },
+  "NOTICE": {
+   "bytes": 1648,
+   "mode": "644",
+   "sha256": "d774972fb303e07ffa8743d43e688439a0fa0532059178737968e13c553a3420"
+  },
+  "README-phase1.md": {
+   "bytes": 9427,
+   "mode": "644",
+   "sha256": "c5eb6ca94a89cd8f7a02ecf3f93c1247c6295bcc81894696cef410ac1ef85d3f"
+  },
+  "README.md": {
+   "bytes": 1039,
+   "mode": "644",
+   "sha256": "4e326817beb1b3a43f36a6baac8fb7644591b7916eee751ba16555ed5f34a4f8"
+  },
+  "configs/a0-vllm.yaml": {
+   "bytes": 1026,
+   "mode": "644",
+   "sha256": "249a62bb2c05dcc36adf7de722c3ab814343eaf3d4d3ef0da469cb89e6fa8535"
+  },
+  "configs/agent-vllm.yaml": {
+   "bytes": 1972,
+   "mode": "644",
+   "sha256": "d34b3a8c543492ecfac8528cf63ed34538e181a69e5e78654d0b1ef1b2d22f67"
+  },
+  "configs/arm-think-vllm.yaml": {
+   "bytes": 1114,
+   "mode": "644",
+   "sha256": "bcc88792d283c3d576c0d77cd83958c756d5646e2218499589947e234f3c69cd"
+  },
+  "configs/poc9-teacher.yaml": {
+   "bytes": 1961,
+   "mode": "644",
+   "sha256": "eb6ebf2805050490ab2b7948e02d97bfd267bf29ed11b4864c2efe9d2e5318aa"
+  },
+  "configs/prices.yaml": {
+   "bytes": 5136,
+   "mode": "644",
+   "sha256": "761499d24e58d36e13d6b954947e0f1efe401824abbe17608d49ac4a2296c5ea"
+  },
+  "configs/serving.yaml": {
+   "bytes": 400,
+   "mode": "644",
+   "sha256": "9f33d5bb225f73526bd4c5b767657be54ff1b53d5be55f3da0fa5f3fb7508d8e"
+  },
+  "configs/user.yaml": {
+   "bytes": 1592,
+   "mode": "644",
+   "sha256": "e76820d4c822f5d8dad26e06ca5b533e975e3c1ba617014d9e7942e35b3af8df"
+  },
+  "configs/xp-partner-endpoint.yaml": {
+   "bytes": 1442,
+   "mode": "644",
+   "sha256": "1bbb5e29bd9dec0d24297b010341058c3d3b9611af80c5ba62729f5641aad3b8"
+  },
+  "package/cases/address-sentinel.jsonl": {
+   "bytes": 244008,
+   "mode": "644",
+   "sha256": "20511ebe924c69da83d1335e1491e7d07066754457df8c70ce84903a6f1b953f"
+  },
+  "package/cases/address-test.questions.jsonl": {
+   "bytes": 8912907,
+   "mode": "644",
+   "sha256": "f7922e3457bfa360240251ef3e822e4b13e5e974f60b45176b28ca5d5cd2fadb"
+  },
+  "package/cases/address-train.jsonl": {
+   "bytes": 1224461,
+   "mode": "644",
+   "sha256": "8f737ea560408803e4d32212e1cf4cd0f92fd0d178abc59a594894ca9b2e6c98"
+  },
+  "package/cases/address-validation.jsonl": {
+   "bytes": 486920,
+   "mode": "644",
+   "sha256": "7b8a15266c54eedd736f55085460787ceb3c545e5cb50abbf07a35a377034e69"
+  },
+  "package/cases/sequence-sentinel.jsonl": {
+   "bytes": 280371,
+   "mode": "644",
+   "sha256": "c99cb7813d0a91754fbf978116e0892f6439c0847466246f8e675d498c25392e"
+  },
+  "package/cases/sequence-test.questions.jsonl": {
+   "bytes": 8157280,
+   "mode": "644",
+   "sha256": "b768a9d8e31b896ea1b224db82058244cf8eb2c2369f26030a80e2b5b8286625"
+  },
+  "package/cases/sequence-train.jsonl": {
+   "bytes": 3732627,
+   "mode": "644",
+   "sha256": "a347a9b831bec23cb0a376543e4732ffb6ef401d94a8e85005ac528f10e2218f"
+  },
+  "package/cases/sequence-validation.jsonl": {
+   "bytes": 567390,
+   "mode": "644",
+   "sha256": "a2b6e43792f2349b1b3b185e7081b666338d48affd8a1859b2d1d1fd2593a670"
+  },
+  "package/cases/variant-sentinel.jsonl": {
+   "bytes": 233685,
+   "mode": "644",
+   "sha256": "05ffef7f540c5ea7039d0c802fe64daaec007044a38a97eb02d841cc53297946"
+  },
+  "package/cases/variant-test.questions.jsonl": {
+   "bytes": 7244598,
+   "mode": "644",
+   "sha256": "b030b44117c991bdd99e033398d719fffd6c0e5b3f11b6ef848737e85350dc6c"
+  },
+  "package/cases/variant-train.jsonl": {
+   "bytes": 3185078,
+   "mode": "644",
+   "sha256": "7615acc0ee40133b5b0dbf908db2e42fdc936567ae8cb5fa6aa5c3240f13a697"
+  },
+  "package/cases/variant-validation.jsonl": {
+   "bytes": 485095,
+   "mode": "644",
+   "sha256": "58c195b909a4d9d787a5d9b614b459fbb32c46656953fac24028fa00b50cd83f"
+  },
+  "package/plan.json": {
+   "bytes": 47078,
+   "mode": "644",
+   "sha256": "669a224fda89e861890fe8a98f4dcd2f091aa1eabb95810e26e95409a89d120e"
+  },
+  "package/protocol.md": {
+   "bytes": 13630,
+   "mode": "644",
+   "sha256": "7f5c693dc41775dbdf5fc4ebb1c8b2ec0d76b6a7e69191b797d509f4da102ccd"
+  },
+  "package/registration.json": {
+   "bytes": 9448,
+   "mode": "644",
+   "sha256": "2871767c882401b7c07f5007d28593d59e8075f3816d79e91eeae84464b997d0"
+  },
+  "pyproject.toml": {
+   "bytes": 1226,
+   "mode": "644",
+   "sha256": "70b3f5527403905694bcf893e01beee28ec24305f65cfac8220ef2b8f2d32d07"
+  },
+  "scripts/xp/fetch_vendor.sh": {
+   "bytes": 1080,
+   "mode": "755",
+   "sha256": "a7dc67e19a9a484ea9655ca5754b69f276349e5364123ac2d1eba9aed9e3dd07"
+  },
+  "scripts/xp/run_phase1.sh": {
+   "bytes": 1669,
+   "mode": "755",
+   "sha256": "bc04a9e84e3aefea7ab9d09350fb87de82a93838e9043d4964283f96ff8ade65"
+  },
+  "scripts/xp/xp_boot.py": {
+   "bytes": 6013,
+   "mode": "644",
+   "sha256": "78c27a5b1aaf061f71d43970a3067b3dc2616769b8406f2a225a6fa9e882b2d2"
+  },
+  "slh/__init__.py": {
+   "bytes": 380,
+   "mode": "644",
+   "sha256": "7b17b433cf3605f222231ae32f4a2a6eb5c1ebd2c9cc75ab4c57c79f3787af9f"
+  },
+  "slh/agent.py": {
+   "bytes": 11248,
+   "mode": "644",
+   "sha256": "ea7e838a1d7cf7a19e7d99eafa8837721973078a56b051b1cd3c29503e2afbf5"
+  },
+  "slh/arms/__init__.py": {
+   "bytes": 79,
+   "mode": "644",
+   "sha256": "09128b9d2ca68e7bc0e999af54526d8c294311e41eaef5d44b22829b09f26d02"
+  },
+  "slh/arms/think.py": {
+   "bytes": 7795,
+   "mode": "644",
+   "sha256": "f6b41897c24cf9f3fa963d6dc9f2230f9f91380a795ddf34691b26581bdc49e2"
+  },
+  "slh/budget.py": {
+   "bytes": 48794,
+   "mode": "644",
+   "sha256": "f2e5b6157f8b42f50ea74111ed0573fa072e283162db8a8a1ae0a8f336dd83ee"
+  },
+  "slh/capture.py": {
+   "bytes": 10492,
+   "mode": "644",
+   "sha256": "e133084b7ce5334432cceae450e7745bbf0184fec62bc1625c51fbcc4f0c15f6"
+  },
+  "slh/demo1/__init__.py": {
+   "bytes": 429,
+   "mode": "644",
+   "sha256": "74ec155fde14f5010bd642ac4821878fc112f4bb468ad65fcd2a9610737bcd91"
+  },
+  "slh/demo1/cases.py": {
+   "bytes": 2808,
+   "mode": "644",
+   "sha256": "4bfc36bc3d442fc6746d1dc4b4ad246249843de386e1cfe80bdf0a3c667c8999"
+  },
+  "slh/demo1/cli.py": {
+   "bytes": 8747,
+   "mode": "644",
+   "sha256": "c8ce87fe2d5e7e8af4a7ca43e9b513a443cfe5c36373bdaa642590f82b001176"
+  },
+  "slh/demo1/code_rule.py": {
+   "bytes": 12967,
+   "mode": "644",
+   "sha256": "a7ff9afb81bff5dd428baa25467f100eb46a6a38041dbe61fc4225c2152f0a75"
+  },
+  "slh/demo1/context.py": {
+   "bytes": 7419,
+   "mode": "644",
+   "sha256": "b0712ebe768ebfb010af296c88cde372205b5690af1f695ecaa7fbe9bf9426c8"
+  },
+  "slh/demo1/decide.py": {
+   "bytes": 33522,
+   "mode": "644",
+   "sha256": "866966d6bf15d50f88605cd078b4d51ae8abe562fce42c2501a5bb12c49e0971"
+  },
+  "slh/demo1/estimate.py": {
+   "bytes": 12580,
+   "mode": "644",
+   "sha256": "f1029331c5066c638916efedfb53d83b60ed48822e34934a65d6cae4b5867a84"
+  },
+  "slh/demo1/generate.py": {
+   "bytes": 39810,
+   "mode": "644",
+   "sha256": "b2a474ea010cadaeb8b027d79d345c62f3cb54e7a6cb4fe51b8a16e37a784b81"
+  },
+  "slh/demo1/learn.py": {
+   "bytes": 18649,
+   "mode": "644",
+   "sha256": "ceb2ae65ea6a311baa11baa39de4b1a4158591acbc6ba71a2c16782f8634972c"
+  },
+  "slh/demo1/pipeline.py": {
+   "bytes": 21818,
+   "mode": "644",
+   "sha256": "5b3d58f0f7616d533054dfba06e5bd2bf83996a091c922f9badfdc6e12570374"
+  },
+  "slh/demo1/preflight.py": {
+   "bytes": 14957,
+   "mode": "644",
+   "sha256": "d36ab79a8bcecf1ab202fc7f9859c325480505c9bad33dde431945c3d9070431"
+  },
+  "slh/demo1/schema.py": {
+   "bytes": 6364,
+   "mode": "644",
+   "sha256": "9df6ec1ed44c2e6dff0311cd1885ac54571ecfeaa6b5ce0c583d7fb70ca72d96"
+  },
+  "slh/demo1/score.py": {
+   "bytes": 6390,
+   "mode": "644",
+   "sha256": "b4401220cb465626e0bd8df3bb8a74f88688f0faa093e52f59300e3c4522eeda"
+  },
+  "slh/demo1/validate_independent.py": {
+   "bytes": 22879,
+   "mode": "644",
+   "sha256": "6a7eac7832f6c36b6e390f6212807a354f6117a37472bf96d28b4cf6f1fe5b01"
+  },
+  "slh/execution.py": {
+   "bytes": 44890,
+   "mode": "644",
+   "sha256": "35881ebca847dba7e0beaa285d8fb2f432f1de33d4b0aa23a43283cd36d9d0c5"
+  },
+  "slh/learner/__init__.py": {
+   "bytes": 102,
+   "mode": "644",
+   "sha256": "e1cee2374a7f27d691371960aa76ef29eddf545da5aea61ca17953690d6ac397"
+  },
+  "slh/learner/aliases.py": {
+   "bytes": 14079,
+   "mode": "644",
+   "sha256": "c4a04129cf155135ae0fdb5237ff0d8e379a1d30810f468aaa8352fda32a3e8a"
+  },
+  "slh/learner/evidence.py": {
+   "bytes": 77210,
+   "mode": "644",
+   "sha256": "c10e2e76add21092f354d6c27374670b7c6bf213344193dcbaa44a0f706728cd"
+  },
+  "slh/learner/note_tokens.py": {
+   "bytes": 4188,
+   "mode": "644",
+   "sha256": "17970be63ec868ff15b9cab87dc68005be80ae4f525dd11c11203a0c36d2425b"
+  },
+  "slh/learner/registry.py": {
+   "bytes": 33379,
+   "mode": "644",
+   "sha256": "751cb5d6ab11be156370ed88cbec2b69f6d3d0df5c9975fb89c16c27cf503ac8"
+  },
+  "slh/learner/triage.py": {
+   "bytes": 23708,
+   "mode": "644",
+   "sha256": "631a83cdee607cfd6fe10f7baf6cc6e986c2439a1b2e70bd9324d9835770f95c"
+  },
+  "slh/ledger.py": {
+   "bytes": 15790,
+   "mode": "644",
+   "sha256": "9602b0f69b0146cacd9a73bad9810b1d0071acd9f966acff17f0b9aad8065411"
+  },
+  "slh/lessons.py": {
+   "bytes": 21288,
+   "mode": "644",
+   "sha256": "dce8446848b170fb4026e7c9dbd64900dff059762514cd02148c6c258aab0017"
+  },
+  "slh/openai_compat.py": {
+   "bytes": 10475,
+   "mode": "644",
+   "sha256": "d3c28436067559273d056da1777d418052c1f7341552329b4e8b8e4ee42a26f2"
+  },
+  "slh/poc9/__init__.py": {
+   "bytes": 56,
+   "mode": "644",
+   "sha256": "aa290c72e341aa9bdec7a0a59490041bf35ec619a1aa829840d6c9e8cdd9efe3"
+  },
+  "slh/poc9/arms.py": {
+   "bytes": 5996,
+   "mode": "644",
+   "sha256": "55e22d52cb7a5532293454a67a262586c619ad34c17baa9bb7ca24ad2eafab4a"
+  },
+  "slh/poc9/cases.py": {
+   "bytes": 21427,
+   "mode": "644",
+   "sha256": "1107c222914654ed94a1626f228b29ed64339f82138d8525dc9b776526180def"
+  },
+  "slh/poc9/corrections.py": {
+   "bytes": 5981,
+   "mode": "644",
+   "sha256": "c671f6c79b67dae7a7811bda5a7fa4da8946eb329f53cbdf14b8accaa7fe9e1e"
+  },
+  "slh/poc9/estimate.py": {
+   "bytes": 6727,
+   "mode": "644",
+   "sha256": "db1ad70360be53e73dd425c855b81190aa3b40abe3c346226d401a134c5487cb"
+  },
+  "slh/poc9/learn.py": {
+   "bytes": 13408,
+   "mode": "644",
+   "sha256": "0a44b1ae52bdf424687f64cac54f637c75ce09eff2626265c84bbb7cc38d14f7"
+  },
+  "slh/poc9/loader.py": {
+   "bytes": 1469,
+   "mode": "644",
+   "sha256": "cb4844345801cbede0b998228e731cff6377c81f51c26aec80e506e8fae7c356"
+  },
+  "slh/poc9/pipeline.py": {
+   "bytes": 66195,
+   "mode": "644",
+   "sha256": "9861ee5020449b5eb07aeae3f2418c532c7773f8281e2740277ae20ddcac4940"
+  },
+  "slh/poc9/score.py": {
+   "bytes": 7573,
+   "mode": "644",
+   "sha256": "4f70f648022eb1270d757379b2135fc739f8bd42bec21a8d8df9ea186a2c0137"
+  },
+  "slh/poc9/topup.py": {
+   "bytes": 33411,
+   "mode": "644",
+   "sha256": "988dd9b6bf6eb82e2aaf1ff8816f9bdc5bde410396cfed9be7b2eb37aaad8c10"
+  },
+  "slh/poc9/topup2.py": {
+   "bytes": 13223,
+   "mode": "644",
+   "sha256": "1ec0c9f8c978dddbdea2f24bbbb862601a5da8124841dbe327fa86f9f9ed8a04"
+  },
+  "slh/poc9/validate.py": {
+   "bytes": 2991,
+   "mode": "644",
+   "sha256": "19d726fe9cb09f320c141d53746153a579dbca5a0b24699925647e66e237775d"
+  },
+  "slh/poc9/writers.py": {
+   "bytes": 48307,
+   "mode": "644",
+   "sha256": "7b3659230780a24d588fe2d76725567fbeb1250a821106839300c0b4ac89fba1"
+  },
+  "slh/projection.py": {
+   "bytes": 8423,
+   "mode": "644",
+   "sha256": "efcaad2b35c9f32983c0e5000f8a39126d0a8cf7b0d200b3a9e10e763bb62c90"
+  },
+  "slh/provider.py": {
+   "bytes": 33628,
+   "mode": "644",
+   "sha256": "fd4c07ce6931a17d47e6b454f11fdf44ebb6644b3f06a7f46a00c590fd53b8c4"
+  },
+  "slh/runner.py": {
+   "bytes": 97447,
+   "mode": "644",
+   "sha256": "120119de93c5c5912333a6f3851fe5c6b27ef05721281c88a374fd3d5c24ef03"
+  },
+  "slh/sealing.py": {
+   "bytes": 4671,
+   "mode": "644",
+   "sha256": "346f8bb0a25ffb7b728ea570d82dd03d62617130a33b4b77885ec1db010929ed"
+  },
+  "slh/serve_spec.py": {
+   "bytes": 5829,
+   "mode": "644",
+   "sha256": "9e2403049e7e10cbc20e0c3a3057137af388c42f2c14e0f97c66e2c79a0964b4"
+  },
+  "slh/serving.py": {
+   "bytes": 100996,
+   "mode": "644",
+   "sha256": "506b21c7692d2f1c6ee54fc9eb448efcf67b188b679fddad501837a31c9a7609"
+  },
+  "slh/splits.py": {
+   "bytes": 10618,
+   "mode": "644",
+   "sha256": "a991760ba7f2eeae03d8edcdafba74bf603d270bcf983707148f692f3b6c8093"
+  },
+  "slh/state.py": {
+   "bytes": 13836,
+   "mode": "644",
+   "sha256": "a13b39dbec368a00643e52065a20d817dd6c899e2087b3a9c409923f000c79f8"
+  },
+  "slh/stub.py": {
+   "bytes": 6885,
+   "mode": "644",
+   "sha256": "43e35c6fc66da9901557dd856925dd5ec2d939a581b36904b7f6f331ac2fe3d4"
+  },
+  "slh/think_projection.py": {
+   "bytes": 15847,
+   "mode": "644",
+   "sha256": "60043b83a7fba54db11c54340c7f2e10ea86f5d51601cea1a041510c30e031a6"
+  },
+  "slh/tokens.py": {
+   "bytes": 10098,
+   "mode": "644",
+   "sha256": "0c7d0c43f46f031a99871f96af115b2257c864688c685f3eda16a472b5baad8f"
+  },
+  "slh/trace.py": {
+   "bytes": 10464,
+   "mode": "644",
+   "sha256": "eec28a401a52473a6efb37308f6747e12959d70880c950d800bf2f212eef0e64"
+  },
+  "slh/window.py": {
+   "bytes": 6162,
+   "mode": "644",
+   "sha256": "62a576ff036efe21a4c896eaed95560544eac41f69a498d2d317b690a754c97e"
+  },
+  "slh/worker.py": {
+   "bytes": 1835,
+   "mode": "644",
+   "sha256": "cb6d6638afca7015fa8ce3fa4f64100870b19e719b300c1445a820aa1ec87847"
+  },
+  "slh/xp/__init__.py": {
+   "bytes": 84,
+   "mode": "644",
+   "sha256": "40f7ded9f0dc864f280a3e0bc7436dc884c61bb1fd69eef345530116e43f984f"
+  },
+  "slh/xp/learn/__init__.py": {
+   "bytes": 399,
+   "mode": "644",
+   "sha256": "04b592010bbd0f749a0024cf7d2096cc74b9c6e555841530a3dd5261db27154e"
+  },
+  "slh/xp/learn/library.py": {
+   "bytes": 4138,
+   "mode": "644",
+   "sha256": "a3041763e85d2b9dff559ac81ae0f3562666e174b02f2c83175d9c39a8bd351c"
+  },
+  "slh/xp/learn/loop.py": {
+   "bytes": 23988,
+   "mode": "644",
+   "sha256": "4b87ebf9fc237d3f7fdd0787a9c94628f165dc55f1e29d540212e979a03fb313"
+  },
+  "slh/xp/learn/ops.py": {
+   "bytes": 11071,
+   "mode": "644",
+   "sha256": "618c4339e6182749179b6494c9162bbbefd35f6b1e262ce32191ffef34ddb587"
+  },
+  "slh/xp/partner/__init__.py": {
+   "bytes": 101,
+   "mode": "644",
+   "sha256": "94b962f7615f3670036915ec3187d1fa2c33f179b6eceb47ed73e0bd116d3a96"
+  },
+  "slh/xp/partner/check.py": {
+   "bytes": 37037,
+   "mode": "644",
+   "sha256": "9d183c754565ef33ca5e73411bfa41342a30f2bfd20bcb7e1a1f0c60406f28c7"
+  },
+  "slh/xp/partner/common.py": {
+   "bytes": 10938,
+   "mode": "644",
+   "sha256": "9932d1c447edcdbd07b5576cc74a9d9573addd537e785f849a3b8db2da685276"
+  },
+  "slh/xp/partner/corrections.py": {
+   "bytes": 7710,
+   "mode": "644",
+   "sha256": "48f124a88f20cc2053eda049c6efcbfa8b16e510b0b2bcf9f7f00e1352a78c9c"
+  },
+  "slh/xp/partner/errors.py": {
+   "bytes": 4122,
+   "mode": "644",
+   "sha256": "e3e52e9e6fd0648d8a5febccbd28d28311fe1a4994a169f9de620df656be2d09"
+  },
+  "slh/xp/partner/export.py": {
+   "bytes": 11743,
+   "mode": "644",
+   "sha256": "0aabdfd9de7843b41804bafd69e9fc695cc23d6e2030440112a7d12537216a96"
+  },
+  "slh/xp/partner/learners.py": {
+   "bytes": 37895,
+   "mode": "644",
+   "sha256": "e0bac1cf0a151aa221f088cefa94ec0010e25609edc5159f15fd3c59c0f79422"
+  },
+  "slh/xp/partner/plan.py": {
+   "bytes": 32032,
+   "mode": "644",
+   "sha256": "fa13fbf67636a8e99919a0111b25924f2c03d22e81a52c6479c8f43666a15455"
+  },
+  "slh/xp/partner/runner.py": {
+   "bytes": 40122,
+   "mode": "644",
+   "sha256": "f7917dc0b862db6d34b80faade0ca4fc57f8ca23aed6a20aa2f1850ff3cbfaf3"
+  },
+  "slh/xp/partner/schemas.py": {
+   "bytes": 10506,
+   "mode": "644",
+   "sha256": "61abeddd16e07814be2e15d12b90cbf233c073a2f9cefa8267b21c2bc0c6fa82"
+  },
+  "slh/xp/partner/secret.py": {
+   "bytes": 2549,
+   "mode": "644",
+   "sha256": "2d1f77ad4dba26a2c7c7843548accfeed56db82c824437d9509305505c0258c7"
+  },
+  "slh/xp/partner/vendor.py": {
+   "bytes": 2498,
+   "mode": "644",
+   "sha256": "bc93414e42b582d6040005871e59a7b6fe24f09c872a65368fc72fec2a6cc83a"
+  },
+  "slh/xp/score.py": {
+   "bytes": 14736,
+   "mode": "644",
+   "sha256": "8b1773c67f5a49e11cd65e9cca82051079f8e98b4bf80f8f4f85dab2c0b154db"
+  },
+  "slh/xp/tasks/__init__.py": {
+   "bytes": 86,
+   "mode": "644",
+   "sha256": "d1d8628c3fdd04847f669f44dfccd4b94b07e9444f1598c7adff1b5f1bc09243"
+  },
+  "slh/xp/tasks/address.py": {
+   "bytes": 23725,
+   "mode": "644",
+   "sha256": "92c02c6f7f825e05f9d55793c819b4214ea274d7ce91dbf17e55346e1ace5b64"
+  },
+  "slh/xp/tasks/cli.py": {
+   "bytes": 4399,
+   "mode": "644",
+   "sha256": "bb4775b7d7f7b83816c3c03e3ebbde3393f908706164abfddf7b17252858f668"
+  },
+  "slh/xp/tasks/common.py": {
+   "bytes": 19244,
+   "mode": "644",
+   "sha256": "43f2cedbde42c42cd77428b79d64ad6b4ed4fb59410894085ac467fdc2cbedf2"
+  },
+  "slh/xp/tasks/sequence.py": {
+   "bytes": 15835,
+   "mode": "644",
+   "sha256": "3068424f66a53bb2338f616b1beaec191c79010a75075bae508023cbc9e57014"
+  },
+  "slh/xp/tasks/variant.py": {
+   "bytes": 17941,
+   "mode": "644",
+   "sha256": "59c82a12f5bbb5a21b47a987852528c45b1e5fdecd0062bbb0e3f511a30d1d73"
+  },
+  "slh/xp/validate.py": {
+   "bytes": 16215,
+   "mode": "644",
+   "sha256": "ccee761857caedfccba2942f8b07fd7b71e663d13b99fd24ee5d0d6d51db2b8b"
+  },
+  "slurm/download.sbatch": {
+   "bytes": 2474,
+   "mode": "755",
+   "sha256": "0c8d3f6859d564d296914e772422fe2483fd420e1f3a704fd5050a95d76e4960"
+  },
+  "slurm/lib.sh": {
+   "bytes": 11156,
+   "mode": "644",
+   "sha256": "4722640ee9db0cca5d3347c80577e5a46cc6a143943000c1077adcc345bc5581"
+  },
+  "slurm/phase0.sbatch": {
+   "bytes": 4283,
+   "mode": "755",
+   "sha256": "60f258f0e33d249e22c879451bc7d8f32b43362658490aa9593e14c3e8d8956a"
+  },
+  "slurm/phase1.sbatch": {
+   "bytes": 7428,
+   "mode": "755",
+   "sha256": "bfca989a6807c527919c77b4dfea12ff5e05af364aea4403dbd244928d340cf3"
+  },
+  "slurm/selftest.sh": {
+   "bytes": 3522,
+   "mode": "755",
+   "sha256": "2d6f013bcc7fedc866b1e360d293202c0cf11182b62cdf3137fc593a827fb687"
+  },
+  "slurm/sim/bin/nvidia-smi": {
+   "bytes": 235,
+   "mode": "755",
+   "sha256": "caf676412531ee902be3f60e1025fcea12e511f1ef9bf4f96ceb7d3aa5ecb326"
+  },
+  "slurm/sim/bin/sacct": {
+   "bytes": 225,
+   "mode": "755",
+   "sha256": "a3d410c72720b34bb653b8afcf40328b08b36bf8ba66810396faad1058a85e0d"
+  },
+  "slurm/sim/bin/sbatch": {
+   "bytes": 227,
+   "mode": "755",
+   "sha256": "f0d10d4b41c24cb5cd042b1de585b82aaeca3122dc46df221dc17439c96df35e"
+  },
+  "slurm/sim/bin/scontrol": {
+   "bytes": 231,
+   "mode": "755",
+   "sha256": "7081392b198396357b1ae4b3095c5903b855099efe90a59c012ce56ee08222c2"
+  },
+  "slurm/sim/bin/sinfo": {
+   "bytes": 225,
+   "mode": "755",
+   "sha256": "fbeb727ce7976708f8267cab2e87957b2f261345267da5de9d2fc65702f7753e"
+  },
+  "slurm/sim/bin/slurm_sim.py": {
+   "bytes": 12420,
+   "mode": "755",
+   "sha256": "b9825e44795f3da0ce03b2814dbe767081e0858bc113440dde37b84dad85ef20"
+  },
+  "slurm/sim/bin/squeue": {
+   "bytes": 227,
+   "mode": "755",
+   "sha256": "2c666bd7873fa465ff49df6958273134533bd1fc0c0afb0db2d62d3ee3470d12"
+  },
+  "slurm/sim/bin/srun": {
+   "bytes": 223,
+   "mode": "755",
+   "sha256": "6d831bb296715db52faae2953c07f4e3d0725721f7b56a4ffe021b7be9e06708"
+  },
+  "slurm/sim/bin/vllm": {
+   "bytes": 223,
+   "mode": "755",
+   "sha256": "4b5fc27edd786fff6850f093130b1a550867079cc4c4f80e4d48a6738489f63a"
+  },
+  "slurm/sim/fake_vllm.py": {
+   "bytes": 3758,
+   "mode": "755",
+   "sha256": "14d6ecebda4e2a38fc915b40ae138269fbb5749149e400ae51a8f8e7ba5333fb"
+  },
+  "slurm/submit.sh": {
+   "bytes": 1245,
+   "mode": "755",
+   "sha256": "a7a59f15c219d9af0cef2716e5d175b1d80e23238b566ee258a3816a71c2e0db"
+  },
+  "slurm/xpsite.py": {
+   "bytes": 33347,
+   "mode": "755",
+   "sha256": "3b297e38456ab9be8445e5c9e8b22b71296784854b70f4e0f6d350b90166148f"
+  }
+ },
+ "kit_repo": "hopit-ai/self-learning-harness-kit",
+ "plan_id": "xp-p1-2026-10-10",
+ "plan_sha256": "8c56c6c008863a75c6adc5dc8f06261c09899ab93331c3e173adf8e8476e538c",
+ "registration_sha256": "2871767c882401b7c07f5007d28593d59e8075f3816d79e91eeae84464b997d0",
+ "schema": "xp-public-kit-v1",
+ "slurm_blobs": {
+  "download.sbatch": "bb3db22855576aaa885fdb7e82a6b413ff505d15",
+  "lib.sh": "ccd41426fd75939620369c30ba14b0b584f2a660",
+  "phase0.sbatch": "b32ee20ede4e46e91c18c21cd18563dd45b8b24a",
+  "phase1.sbatch": "ce30c0fd802701f5f3a013f3fa25c034ee7ac5b7",
+  "selftest.sh": "1b46abc0be8e689a639d453038ed9149638d1001",
+  "sim/bin/nvidia-smi": "e08b2c7ea4aa20e02e3408a942d3009f7327e9f0",
+  "sim/bin/sacct": "4a1550138116a13bcc6368c3674a08c36cc9304e",
+  "sim/bin/sbatch": "c3318ea0b7e6f9567a287f04c0514e1a2ded21e4",
+  "sim/bin/scontrol": "1571a4d6cb35846bc1cad1b23137b392784fea0d",
+  "sim/bin/sinfo": "788122f607dae2f29d72f28238ec04b8a19ad1ce",
+  "sim/bin/slurm_sim.py": "56a86f917e74604bfb689cbfc6066b0185dc628c",
+  "sim/bin/squeue": "79ebce2d740c329dbb19348c071665c4c994c3ed",
+  "sim/bin/srun": "69e83fff177aae3d4f1320fe5c624115801f370e",
+  "sim/bin/vllm": "1279a836951ab6d7b0db09034b2ab7743c262596",
+  "sim/fake_vllm.py": "4e24ddde59a301f5f3cd8b1202728379372ecdf3",
+  "submit.sh": "bf080ccd0bab774a33cea8437ef57a4644d219e6",
+  "xpsite.py": "2908f4f0612b834f7d103e291da2c000d12e36b5"
+ },
+ "tags": {
+  "phase0": "xp-p1-phase0-v1",
+  "phase1": "xp-p1-v1"
+ },
+ "total_bytes": 36379733
+}

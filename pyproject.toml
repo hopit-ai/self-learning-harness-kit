@@ -1,0 +1,43 @@
+[project]
+name = "slh"
+version = "0.0.1"
+description = "Self-learning tool-use harness on tau2-bench"
+requires-python = ">=3.12"
+dependencies = [
+    # tau2-bench v1.0.1, commit 672227c6b6676edc20d57ea53b7000262aae77b9, vendored at
+    # vendor/tau2-bench and installed editable (pip install -e vendor/tau2-bench).
+    "tau2",
+    "pyyaml>=6",
+    "jinja2>=3.1",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+# python -m slh serve (self-served agent on Modal); tests mock it.
+serve = ["modal==1.5.3"]
+
+[tool.uv.sources]
+tau2 = { path = "vendor/tau2-bench", editable = true }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["slh", "slh.arms", "slh.learner", "slh.analysis", "slh.genpilot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["vendor", "runs"]
+
+[tool.ruff.lint]
+# TRY004 asks for TypeError on failed isinstance checks. Here those checks
+# validate parsed JSON/YAML data, where ValueError is the right signal and
+# callers and tests catch ValueError; switching would change behaviour.
+extend-ignore = ["TRY004"]

@@ -1,0 +1,35 @@
+# Self-served agent: Qwen3.5-9B on our own vLLM server on Modal (python -m slh
+# serve start; docs/self-served-agent.md). Same model and request semantics as
+# agent.yaml (non-thinking, temperature 0.0, per-trial seed, no max_tokens),
+# a different serving stack: results do NOT compare with the OpenRouter /
+# DeepInfra baseline without a paired check (docs/self-served-agent.md, Parity).
+#
+# serving_session names the session directory `serve start --out` wrote. The
+# endpoint URL, the bearer token (serving/<session>/private/token) and the
+# window's deadlines come from it at request time, so this config (and a run's
+# config hash) stays the same from one serving window to the next and an
+# aborted run resumes in a later window. Relative paths are from the repo root.
+# After the window's request deadline every agent request is refused before it
+# is sent and the run aborts resumably (the interrupted episode is not written).
+#
+# chat_template_kwargs {enable_thinking: false} is Qwen3.5's documented switch
+# to non-thinking mode (the chat template then emits an empty think block);
+# the server also defaults to it (--default-chat-template-kwargs).
+# capture: auto probes once per run and requests token ids + log-probs if the
+# server verifiably returns them (--return-tokens-as-token-ids, --logprobs-mode
+# processed_logprobs). RL export still refuses temperature 0 (not on-policy
+# sampling); the ids/log-probs are recorded for every call regardless.
+# Price: $0 per token (prices.yaml qwen3.5-9b-vllm); GPU time is metered in the
+# serving session's ledger instead.
+backend: openai_compatible
+model: qwen3.5-9b-vllm
+# The verified smoke session (probe, prefetch and timeout measurement passed 2026-10-06).
+serving_session: serving/smoke
+checkpoint: Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a
+temperature: 0.0
+retries: 6
+reasoning_reserve_tokens: 0
+capture: auto
+logprobs_mode: processed_logprobs
+chat_template_kwargs:
+  enable_thinking: false

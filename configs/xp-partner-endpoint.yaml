@@ -1,0 +1,21 @@
+# Partner endpoint for the XP phase-1 runner (docs/xp/partner-package.md).
+# The partner fills this in; it is copied into env.json (no secrets here: the
+# bearer token, if any, is read from the environment variable named below).
+#
+# model must stay the served name below: it is the price-table key
+# (configs/prices.yaml, $0 per token), so the request meter accepts it.
+base_url: http://127.0.0.1:8000/v1
+model: qwen3.5-9b-vllm
+api_key_env: null              # e.g. VLLM_API_KEY if the server requires a token
+model_revision: null           # must equal slh/serve_spec.py MODEL_REVISION
+vllm_version: null             # pinned: slh/serve_spec.py VLLM_VERSION
+serving_args: null             # the exact `vllm serve` argv (slh/serve_spec.py vllm_args)
+replicas: null                 # number of GPUs/replicas behind base_url
+concurrency: 8                 # in-flight decisions from this runner
+teacher:                       # needed when the plan has T/T+ writers or a teacher critic
+  mode: self_hosted            # self_hosted (default; no API key) or api (configs/poc9-teacher.yaml)
+  base_url: null               # OpenAI-compatible /v1 URL of the self-hosted teacher
+  model: null                  # its served model name
+  api_key_env: null
+  extra: {}                    # extra request fields, e.g. chat_template_kwargs for non-thinking
+  weights: null                # checkpoint id and revision (e.g. the FP8 weights), for env.json
