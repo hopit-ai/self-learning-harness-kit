@@ -32,6 +32,10 @@ REPLY = os.environ.get("SIM_VLLM_REPLY",
                        "Could you please confirm which order and which item you mean?")
 
 
+COUNTERS = {"prompt": 0, "generation": 0, "requests": 0, "running": 0}
+LOCK = threading.Lock()
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write(f"[fake-vllm {NAME}] {fmt % args}\n")
@@ -53,6 +57,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._send(200, {})
+        elif self.path == "/metrics":
+            with LOCK:
+                c = dict(COUNTERS)
+            text = ("# vLLM-style metrics (fake)\n"
+                    f'vllm:prompt_tokens_total{{model_name="{NAME}"}} {c["prompt"]}\n'
+                    f'vllm:generation_tokens_total{{model_name="{NAME}"}} {c["generation"]}\n'
+                    f'vllm:request_success_total{{finished_reason="stop"}} {c["requests"]}\n'
+                    f'vllm:num_requests_running{{model_name="{NAME}"}} {c["running"]}\n'
+                    f'vllm:prefix_cache_queries_total{{model_name="{NAME}"}} {c["prompt"]}\n'
+                    f'vllm:prefix_cache_hits_total{{model_name="{NAME}"}} {c["prompt"] // 2}\n')
+            data = text.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
         elif self.path == "/version":
             self._send(200, {"version": "0.30.0"})
         elif self.path == "/v1/models":
@@ -77,6 +97,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": {"message": "model {!r} not served".format(body.get("model"))}})
             return
         prompt = sum(len(str(m.get("content") or "")) for m in body.get("messages", [])) // 4
+        with LOCK:
+            COUNTERS["prompt"] += max(1, prompt)
+            COUNTERS["generation"] += 14
+            COUNTERS["requests"] += 1
         self._send(200, {
             "id": "chatcmpl-sim", "object": "chat.completion", "created": int(time.time()),
             "model": NAME,

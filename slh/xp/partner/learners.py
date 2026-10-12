@@ -27,10 +27,12 @@ offline (dry run, tests).
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import json
 import re
 import shutil
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -139,8 +141,8 @@ def run_note_learning(writer: TaskNoteWriter, *, train: list[dict[str, Any]],
                       decide: Callable[[dict[str, Any], str], dict[str, Any]],
                       critic: Any, out: Path, policy: str, score_fn: Callable,
                       correct_fn: Callable, can_decide: Callable[[], bool],
-                      batch: int = 4, evidence_cls: type = TaskEvidence, prefix: str = ""
-                      ) -> dict[str, Any]:
+                      batch: int = 4, evidence_cls: type = TaskEvidence, prefix: str = "",
+                      critic_mode: str = "binding") -> dict[str, Any]:
     """POC 9's loop over a run's training stream (the registered sample, in its
     order). Stops early when the decision budget is spent (``can_decide``)."""
     from slh.poc9.learn import gate
@@ -149,7 +151,7 @@ def run_note_learning(writer: TaskNoteWriter, *, train: list[dict[str, Any]],
     for name in ("episodes", "patches"):
         (out / f"{prefix}{name}.jsonl").write_text("", encoding="utf-8")
     skill, pending, snapshots = "", [], [""]
-    patches = accepted = episodes = 0
+    patches = accepted = episodes = would_block = 0
     stop = "end"
     for n, case in enumerate(train, 1):
         if not can_decide():
@@ -166,7 +168,7 @@ def run_note_learning(writer: TaskNoteWriter, *, train: list[dict[str, Any]],
         episodes += 1
         score = score_fn(case, decision["action"])
         correction = correct_fn(case, decision["action"])
-        pc.append_jsonl(out / f"{prefix}episodes.jsonl", [{
+        pc.append_jsonl(out / f"{prefix}episodes.jsonl", sync=False, rows=[{
             "case_id": case["case_id"], "stream_position": n, "action": decision["action"],
             "score": score, "correction": correction, "error": error,
             "skill_sha256": sha256_text(skill) if skill else None}])
@@ -185,21 +187,29 @@ def run_note_learning(writer: TaskNoteWriter, *, train: list[dict[str, Any]],
                        "critique": None}
         else:
             verdict = gate(patch, evidence, critic, writer.budget)
+            if critic_mode == "advisory" and verdict["stage"] == "critique":
+                # Advisory critic (owner decision 2026-10-12): logged, never blocking;
+                # the mechanical checks passed, so the patch stands.
+                blocked = not verdict["accepted"]
+                would_block += blocked
+                verdict = {**verdict, "accepted": True, "would_have_blocked": blocked}
         patches += 1
         if verdict["accepted"]:
             accepted += 1
             skill = patch.text
             snapshots.append(skill)
-        pc.append_jsonl(out / f"{prefix}patches.jsonl", [{
+        pc.append_jsonl(out / f"{prefix}patches.jsonl", sync=False, rows=[{
             "after_episode": n, "writer": writer.name, "episodes": sorted(evidence.indices()),
             "evidence_sha256": sha256_text(evidence.text()), "accepted": verdict["accepted"],
             "stage": verdict["stage"], "problems": verdict["problems"],
+            "would_have_blocked": verdict.get("would_have_blocked"),
             "critique": {k: v for k, v in (verdict["critique"] or {}).items() if k != "call"}
             or None, "patch": patch.to_dict(), "writer_budget": writer.budget.to_dict(),
             "skill_sha256_after": sha256_text(skill) if skill else None}])
         pending = []
     return {"skill": skill, "snapshots": snapshots, "proposals": patches,
-            "accepted": accepted, "episodes": episodes, "stop_reason": stop}
+            "accepted": accepted, "episodes": episodes, "stop_reason": stop,
+            "would_have_blocked": would_block}
 
 
 # --------------------------------------------------------------------------- chats
@@ -259,7 +269,9 @@ class FakeChat:
             return '{"contradictions": []}', usage, None
         if system.startswith("You maintain a library"):
             labels = re.findall(r"\bE(\d+)\b", user)
-            i = self.calls % len(self.LESSONS)
+            # From the prompt, not a call counter: replies do not depend on the order in
+            # which concurrent learning units call a shared chat.
+            i = int(pc.sha_text(system + "\n" + user)[:8], 16) % len(self.LESSONS)
             op = {"op": "add", "when": self.LESSONS[i], "then": self.THEN[i],
                   "cases": [f"E{labels[0] if labels else 1}"]}
             return json.dumps({"ops": [op]}), usage, None
@@ -347,7 +359,11 @@ def teacher_extras(extra: Any) -> dict[str, Any]:
 class SelfHostedChat:
     """The teacher on the partner's own OpenAI-compatible endpoint ($0 per token;
     temperature 0, the plan's output cap, 2 retries, non-thinking extras only).
-    Built like POC 9's ``TeacherChat``; not exercised against a live endpoint here."""
+    Built like POC 9's ``TeacherChat``; not exercised against a live endpoint here.
+    Thread-safe: one meter and backend per thread (learning units run concurrently;
+    the server batches their requests)."""
+
+    per_thread = True
 
     def __init__(self, cfg: dict[str, Any], *, max_tokens: int = 4096) -> None:
         from slh.budget import Meter, ModelConfig, Price
@@ -366,10 +382,24 @@ class SelfHostedChat:
             raise ValueError("teacher decoding settings must stay fixed")
         # No pause-and-retry beyond the configured retries: at most retries + 1
         # transport dispatches per call (charged against the writer's ceiling).
-        self.meter = Meter(1.0, {self.model.model: Price(input=0.0, output=0.0,
-                                                         cached_input=0.0)}, max_pauses=0)
-        self.backend = guard_backend(OpenAICompatibleBackend(self.model, "teacher"))
+        self._make_meter = lambda: Meter(1.0, {self.model.model: Price(
+            input=0.0, output=0.0, cached_input=0.0)}, max_pauses=0)
+        self._make_backend = lambda: guard_backend(
+            OpenAICompatibleBackend(self.model, "teacher"))
+        self._local = threading.local()
         self.max_dispatches = self.model.retries + 1
+
+    @property
+    def meter(self) -> Any:
+        if not hasattr(self._local, "meter"):
+            self._local.meter = self._make_meter()
+        return self._local.meter
+
+    @property
+    def backend(self) -> Any:
+        if not hasattr(self._local, "backend"):
+            self._local.backend = self._make_backend()
+        return self._local.backend
 
     def __call__(self, system: str, user: str, purpose: str = "write"):
         from tau2.data_model.message import SystemMessage, UserMessage
@@ -450,6 +480,7 @@ class LearnSettings:
     ops: dict[str, Any] = dataclasses.field(default_factory=dict)  # LoopConfig fields
     note_batch: int = 4
     budgets: dict[str, Any] = dataclasses.field(default_factory=dict)
+    critic_mode: str = "binding"  # "advisory" from the plan (owner decision 2026-10-12)
 
     @classmethod
     def from_plan(cls, plan: dict[str, Any]) -> LearnSettings:
@@ -459,7 +490,8 @@ class LearnSettings:
         budgets = learning.get("budgets") or default_budgets()
         check_budgets(budgets)
         return cls(ops=dict(learning.get("ops") or {}),
-                   note_batch=int(learning.get("note_batch", 4)), budgets=budgets)
+                   note_batch=int(learning.get("note_batch", 4)), budgets=budgets,
+                   critic_mode=str(learning.get("critic_mode", "binding")))
 
     def components(self) -> dict[str, Component]:
         from slh.xp.partner.plan import BUDGET_COMPONENTS
@@ -528,12 +560,29 @@ class PartnerLearner:
         self.agent_chat, self.teacher_chat = agent_chat, teacher_chat
         self.decide_fn, self.settings = decide, settings or LearnSettings()
         self.policy = policy
-        self.halted: str | None = None
+        self._halt = [None]  # shared by every unit copy: one halt stops all units
+        self._case_errors: list[dict[str, Any]] = []
+
+    @property
+    def halted(self) -> str | None:
+        return self._halt[0]
+
+    @halted.setter
+    def halted(self, value: str | None) -> None:
+        self._halt[0] = value
+
+    def unit_copy(self) -> PartnerLearner:
+        """A learner for one unit run concurrently with others: shared chats, decide
+        function, settings and halt latch; its own per-unit state."""
+        other = copy.copy(self)
+        for name in ("_acquisition", "_full_context", "_context_budget", "_case_errors"):
+            other.__dict__.pop(name, None)
+        return other
 
     def halt(self, error: str) -> None:
         from slh.poc9.pipeline import latch_credit
 
-        self.halted = self.halted or error
+        self._halt[0] = self._halt[0] or error
         latch_credit(f"learning halt: {error}")  # no request leaves anywhere after this
 
     def check_halt(self) -> None:
@@ -560,10 +609,19 @@ class PartnerLearner:
                 self.halt(f"{type(exc).__name__}: {exc}")
                 raise RunHalted("decision", f"{type(exc).__name__}: {exc}") from exc
             except Exception as exc:
-                if classify(exc)[0] == "halt":
+                kind, label = classify(exc)
+                if kind == "halt":
                     self.halt(f"{type(exc).__name__}: {exc}")
                     raise RunHalted("decision", f"{type(exc).__name__}: {exc}") from exc
-                raise
+                # A case-level outcome (context limit, timeout, malformed reply) in
+                # acquisition, mining, dev or sentinel evaluation: the decision is
+                # "none" (scored incorrect), recorded, and learning continues; the unit
+                # can never fail again on resume for this reason.
+                self._case_errors.append({"case_id": case.get("case_id"), "class": label})
+                return {"action": {"type": "none", "reason": label}, "reads": [],
+                        "model_calls": 0, "input_tokens": 0, "output_tokens": 0,
+                        "failed_attempts": 0, "capped": False,
+                        "error": f"{type(exc).__name__}: {str(exc)[:300]}"}
         return decide
 
     def _scoring(self, case: dict[str, Any]) -> tuple[Callable, Callable]:
@@ -595,12 +653,27 @@ class PartnerLearner:
             blocks.append(f"Episode {i}:\n{render_transcript(case['messages'])}\n"
                           + json.dumps(fb, sort_keys=True))
         self._acquisition = rows
-        return ("Training histories and deterministic feedback:\n\n" + "\n\n".join(blocks),
-                len(blocks))
+        header = "Training histories and deterministic feedback:\n\n"
+        params = getattr(self, "_context_budget", None)
+        if params is None:
+            self._full_context = None
+            return header + "\n\n".join(blocks), len(blocks)
+        # Amendment-2 rule (proposed): as many WHOLE episodes as fit, in training-stream
+        # order, measured on the real request with the guard's accounting; the same
+        # text for every test case of this run.
+        from slh.xp.partner.context import fit_full_context
+
+        text, self._full_context = fit_full_context(header, blocks, train[0], params)
+        return text, len(blocks)
 
     def learn(self, *, task: str, writer: str, run: int, critic: str,
               train: list[dict[str, Any]], dev: list[dict[str, Any]], out: Path,
-              seed: int = 0, sentinel: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+              seed: int = 0, sentinel: list[dict[str, Any]] | None = None,
+              context_budget: int | None = None) -> dict[str, Any]:
+        """``context_budget``: the 9B token budget of the full-context text (the
+        amendment-2 rule); None keeps every episode (plans before the rule)."""
+        self._context_budget = context_budget
+        self._case_errors: list[dict[str, Any]] = []
         if writer not in WRITERS:
             raise ValueError(f"writer is one of {WRITERS}")
         out = Path(out)
@@ -648,7 +721,8 @@ class PartnerLearner:
             (out / name).unlink(missing_ok=True)
         return {"skill": text, "snapshots": snapshots, "proposals": res["steps"],
                 "accepted": res["accepted"], "stop_reason": res["stop_reason"],
-                "episodes": res["decisions"]}
+                "episodes": res["decisions"],
+                "would_have_blocked": int(res.get("critic_would_have_blocked", 0))}
 
     def _learn(self, task: str, writer: str, run: int, critic: str,
                train: list[dict[str, Any]], dev: list[dict[str, Any]],
@@ -669,12 +743,12 @@ class PartnerLearner:
         score_fn, correct_fn = self._scoring(train[0])
 
         evidence, acquired = self.full_context(train, comps["acquisition"])
-        pc.append_jsonl(out / "acquisition.jsonl", self._acquisition)
+        pc.append_jsonl(out / "acquisition.jsonl", self._acquisition, sync=False)
         self.check_halt()
         if writer.endswith("+"):
             common = {"train": train, "dev": dev, "critic": critic, "critic_chat": critic_chat,
                       "policy": policy, "score_fn": score_fn, "correct_fn": correct_fn,
-                      "task_text": TASK_TEXT[task]}
+                      "task_text": TASK_TEXT[task], "critic_mode": self.settings.critic_mode}
             main = self._ops(writer, chat, role, comps["learn"], out=out,
                              render=render_task_evidence, common=common, seed=seed,
                              per_call=per_call)
@@ -686,7 +760,7 @@ class PartnerLearner:
         else:
             kw = {"train": train, "critic": critic_chat, "policy": policy,
                   "score_fn": score_fn, "correct_fn": correct_fn,
-                  "batch": self.settings.note_batch}
+                  "batch": self.settings.note_batch, "critic_mode": self.settings.critic_mode}
             note = TaskNoteWriter(writer, chat, role, task)
             note.budget = comps["learn"].writer_budget(per_call)
             main = run_note_learning(note, out=out, decide=self._decider(comps["learn"]),
@@ -736,7 +810,12 @@ class PartnerLearner:
         budgets["total"] = {k: sum(b[k] for b in budgets.values())
                             for k in ("calls", "output_tokens", "decisions")}
         summary = {"task": task, "writer": writer, "run": run, "seed": seed, "critic": critic,
-                   "check": xl.check_label(critic), "loop": loop,
+                   "check": xl.check_label(critic, self.settings.critic_mode), "loop": loop,
+                   "critic_mode": self.settings.critic_mode,
+                   # Descriptive: edits an advisory critic would have blocked.
+                   "critic_would_have_blocked": {
+                       "learned": int(main.get("would_have_blocked", 0)),
+                       "search_control": int(search.get("would_have_blocked", 0))},
                    "train_case_ids_sha256": pc.sha_text(pc.canonical(
                        [c["case_id"] for c in train])),
                    "train_cases": len(train), "dev": len(dev), "sentinel": len(sentinel),
@@ -753,5 +832,11 @@ class PartnerLearner:
                    "search_control_sha256": sha256_text(control) if control else None,
                    "skill_tokens": count_tokens(skill) if skill else 0,
                    "generic_ok": bool(generic), "generic_problems": list(gen.problems)}
+        if getattr(self, "_full_context", None) is not None:
+            summary["full_context"] = dict(self._full_context)
+        counts: dict[str, int] = {}
+        for e in self._case_errors:
+            counts[e["class"]] = counts.get(e["class"], 0) + 1
+        summary["case_errors"] = dict(sorted(counts.items()))
         pc.write_json(out / "summary.json", summary)
         return summary

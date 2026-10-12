@@ -195,6 +195,8 @@ def _demo_backend_class() -> type:
             timeout = openai_compat.TIMEOUT_S if self.deadline is None else \
                 max(0.5, min(openai_compat.TIMEOUT_S, self.deadline - now))
             body = self.request_body(messages, tools, seed)
+            if self.context_guard is not None:
+                self.context_guard(body)  # refuses before anything is sent
             self._served = None
             try:
                 response = metered_dispatch(
@@ -360,6 +362,13 @@ class AgentClient:
         return self._local.parts
 
 
+def _new_decision(backend: Any) -> None:
+    """A context guard that tracks growth within a decision starts a new one here."""
+    guard = getattr(backend, "context_guard", None)
+    if guard is not None and hasattr(guard, "new_decision"):
+        guard.new_decision()
+
+
 def _tally(meter: Any) -> tuple[int, int, int, int]:
     t = meter.tally["agent"]
     return t.calls, t.failed_attempts, t.input_tokens, t.output_tokens
@@ -379,6 +388,7 @@ def next_action(case: dict[str, Any], notes: list[str], client: AgentClient, *,
     from slh.capture import sha256_json
 
     backend, meter, env = client.parts()
+    _new_decision(backend)
     agent = build_agent(config or client.config, state_for(notes), backend, meter, env)
     prompt_sha = sha256_json(agent.system_prompt)
     if expect_prompt_sha256 is not None and prompt_sha != expect_prompt_sha256:
@@ -469,6 +479,7 @@ def select(case: dict[str, Any], candidates: list[dict[str, Any]], client: Agent
     flip = int(hashlib.sha256(case["case_id"].encode()).hexdigest(), 16) % 2 == 1
     order = [1, 0] if flip else [0, 1]
     backend, meter, env = client.parts()
+    _new_decision(backend)
     agent = build_agent(client.config, state_for([]), backend, meter, env)
     before = _tally(meter)
     capped_before = getattr(backend, "capped_calls", 0)

@@ -43,6 +43,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -90,6 +91,23 @@ class EndpointError(Exception):
     """A non-transient HTTP error (4xx other than 429)."""
 
 
+class ContextLengthError(EndpointError):
+    """The server refused the request for its length (an HTTP 400 whose body names
+    the context length): a property of this request, not of the endpoint."""
+
+
+_CONTEXT_400 = re.compile(r"maximum context length|context length|context window|"
+                          r"max_model_len|too many tokens|prompt is too long|"
+                          r"input tokens exceed|longer than the maximum", re.IGNORECASE)
+
+
+def _error_body(exc: Any) -> str:
+    try:
+        return exc.read(4000).decode("utf-8", "replace").strip()
+    except Exception:  # noqa: BLE001 - the body is optional detail
+        return ""
+
+
 def post_json(url: str, body: dict[str, Any], headers: dict[str, str],
               timeout: float) -> dict[str, Any]:
     """POST a JSON body; return the JSON reply. Replaced in tests."""
@@ -106,7 +124,11 @@ def post_json(url: str, body: dict[str, Any], headers: dict[str, str],
             raise ServiceUnavailableError(f"HTTP {exc.code} from {url}") from None
         if exc.code >= 500:
             raise InternalServerError(f"HTTP {exc.code} from {url}") from None
-        raise EndpointError(f"HTTP {exc.code} from {url}") from None
+        body = _error_body(exc)
+        detail = f"HTTP {exc.code} from {url}" + (f": {body[:2000]}" if body else "")
+        if exc.code == 400 and _CONTEXT_400.search(body):
+            raise ContextLengthError(detail) from None
+        raise EndpointError(detail) from None
     except TimeoutError:
         raise Timeout(f"timeout after {timeout}s from {url}") from None
     except urllib.error.URLError as exc:
@@ -145,6 +167,9 @@ class OpenAICompatibleBackend:
         self.last_capture: dict[str, Any] | None = None
         self.gate = gate_for(config)
         self._served: tuple[str, str] | None = None  # (api_base, token) of the window
+        # Optional pre-request check of the request body (e.g. the partner runner's
+        # context-length guard); raises to refuse the request before it is sent.
+        self.context_guard: Any = None
 
     def check_window(self) -> None:
         """Self-served windows only: refuse after the deadline (raises)."""
@@ -193,6 +218,8 @@ class OpenAICompatibleBackend:
     def complete(self, messages: list[Any], tools: list[Any] | None,
                  seed: int | None) -> tuple[Any, Usage | None]:
         body = self.request_body(messages, tools, seed)
+        if self.context_guard is not None:
+            self.context_guard(body)  # raises before anything is sent
         self._served = None
         response = metered_dispatch(
             body, lambda sent: post_json(self.url(), sent, self.headers(), TIMEOUT_S),

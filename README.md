@@ -5,8 +5,8 @@ Each package is one tag; check out the tag, never `main`, so we know exactly wha
 
 | Tag | What |
 |---|---|
-| `xp-p1-phase0-v1` | plan `xp-p1-2026-10-10`: phase 0, the site check (no training) |
-| `xp-p1-v1` | plan `xp-p1-2026-10-10`: phase 1, decision-level learning (after phase 0) |
+| `xp-p1-v1` | plan `xp-p1-2026-10-10`: one command for phase 0 (v2), the gate and phase 1 |
+| `xp-p1-phase0-v1` | plan `xp-p1-2026-10-10`: phase 0 v1, the first site check (done) |
 
 Start with [README-phase1.md](README-phase1.md).
 

@@ -156,8 +156,18 @@ def resolve_critic(critic: str, *, teacher: Chat | None = None, agent: Chat | No
     return chat
 
 
-def check_label(critic: str) -> str:
-    return {"teacher": "teacher-checked", "self": "self-checked", "none": "unchecked"}[critic]
+CRITIC_MODES = ("binding", "advisory")
+
+
+def check_label(critic: str, mode: str = "binding") -> str:
+    """``advisory`` (owner decision 2026-10-12): the critic is called and logged but
+    never blocks an edit; mechanical checks, dev validation and sentinel selection
+    decide."""
+    if critic == "none":
+        return "unchecked"
+    if mode == "advisory":
+        return f"advisory-{critic}"
+    return {"teacher": "teacher-checked", "self": "self-checked"}[critic]
 
 
 def first_error(episode: dict[str, Any]) -> dict[str, Any]:
@@ -244,10 +254,13 @@ def run_ops_learning(writer: OpsWriter, *, train: list[dict[str, Any]],
                      render_fn: Callable[[list[dict[str, Any]]], str] | None = None,
                      forbidden_fn: Callable[[list[dict[str, Any]], str], set[str]] | None = None,
                      initial: Library | None = None,
-                     task_text: str | None = None) -> dict[str, Any]:
+                     task_text: str | None = None,
+                     critic_mode: str = "binding") -> dict[str, Any]:
     """One S+/T+ run. ``decide(case, library_text)`` returns a decision dict
     (``action``, ``reads``, ``model_calls``), normally ``slh.poc9.loader.decide``."""
     config = config or LoopConfig()
+    if critic_mode not in CRITIC_MODES:
+        raise ValueError(f"critic mode is one of {CRITIC_MODES}")
     if critic not in CRITICS:
         raise ValueError(f"critic is one of {CRITICS}")
     if (critic == "none") != (critic_chat is None):
@@ -268,7 +281,9 @@ def run_ops_learning(writer: OpsWriter, *, train: list[dict[str, Any]],
     out.mkdir(parents=True, exist_ok=True)
     trace_path = out / "trace.jsonl"
     trace_path.write_text("", encoding="utf-8")
-    base = {"writer": writer.name, "critic": critic, "check": check_label(critic)}
+    base = {"writer": writer.name, "critic": critic, "check": check_label(critic, critic_mode),
+            "critic_mode": critic_mode}
+    would_block = 0
 
     def emit(row: dict[str, Any]) -> None:
         with trace_path.open("a", encoding="utf-8") as handle:
@@ -391,7 +406,13 @@ def run_ops_learning(writer: OpsWriter, *, train: list[dict[str, Any]],
                     emit({**row, "library_sha256": library.sha256()})
                     raise _Halt("credit_halt", crit["call"]["error"])
                 if not crit["ok"]:
-                    group_reason = f"critic ({critic}): {crit['problem']}"
+                    if critic_mode == "advisory":  # logged, never blocking
+                        row["critique"]["would_have_blocked"] = True
+                        would_block += 1
+                    else:
+                        group_reason = f"critic ({critic}): {crit['problem']}"
+                else:
+                    row["critique"]["would_have_blocked"] = False
             if valid and group_reason is None:
                 _, cand_dev = evaluate(dev, cand.render())
                 row["dev_after"] = cand_dev
@@ -440,6 +461,7 @@ def run_ops_learning(writer: OpsWriter, *, train: list[dict[str, Any]],
                "library_state_sha256": library.state_sha256(),
                "library_tokens": library.tokens(), "entries": len(library.entries),
                "rejected_edits": len(rejected), "writer_budget": writer.budget.to_dict(),
+               "critic_would_have_blocked": would_block,
                "decisions": state["decisions"], "agent_model_calls": state["agent_model_calls"],
                "config": config.to_dict()}
     emit({"type": "stop", **{k: summary[k] for k in (

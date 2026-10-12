@@ -132,15 +132,68 @@ def gz_bytes(data: bytes) -> bytes:
     return out.getvalue()
 
 
-def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    """Crash-safe append: one complete line per write, flushed and fsynced."""
+def append_jsonl(path: Path, rows: Iterable[dict[str, Any]], *, sync: bool = True) -> None:
+    """Crash-safe append: one complete line per write, flushed (and fsynced once per
+    call unless ``sync`` is False: files whose unit is redone whole after a crash)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("ab") as handle:
         for row in rows:
             handle.write((json.dumps(row, sort_keys=True, ensure_ascii=True) + "\n").encode())
-            handle.flush()
+        handle.flush()
+        if sync:
             os.fsync(handle.fileno())
+
+
+class GroupAppender:
+    """Group commit for append-only JSONL on slow shared filesystems (Lustre fsync can
+    cost over a second): lines are written and flushed at once, fsynced every
+    ``every_s`` seconds or ``every_rows`` rows and on close. A crash can lose at most
+    the rows since the last fsync (and leave a truncated last line, repaired on
+    resume); resume recomputes what is pending, so those rows are simply redone.
+    Defaults from XP_FSYNC_EVERY_S (2) and XP_FSYNC_ROWS (256)."""
+
+    def __init__(self, path: Path, *, every_s: float | None = None,
+                 every_rows: int | None = None, clock: Any = None) -> None:
+        import time as _time
+
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.every_s = float(os.environ.get("XP_FSYNC_EVERY_S", "2") if every_s is None
+                             else every_s)
+        self.every_rows = int(os.environ.get("XP_FSYNC_ROWS", "256") if every_rows is None
+                              else every_rows)
+        self.clock = clock or _time.monotonic
+        self.handle = self.path.open("ab")
+        self.unsynced, self.last = 0, self.clock()
+        self.syncs = 0
+
+    def write(self, rows: Iterable[dict[str, Any]]) -> None:
+        for row in rows:
+            self.handle.write(
+                (json.dumps(row, sort_keys=True, ensure_ascii=True) + "\n").encode())
+            self.unsynced += 1
+        self.handle.flush()
+        if self.unsynced and (self.unsynced >= self.every_rows
+                              or self.clock() - self.last >= self.every_s):
+            self.sync()
+
+    def sync(self) -> None:
+        self.handle.flush()
+        os.fsync(self.handle.fileno())
+        self.unsynced, self.last = 0, self.clock()
+        self.syncs += 1
+
+    def close(self) -> None:
+        if not self.handle.closed:
+            self.sync()
+            self.handle.close()
+
+    def __enter__(self) -> GroupAppender:  # noqa: PYI034
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
 
 def repair_jsonl(path: Path) -> dict[str, Any] | None:

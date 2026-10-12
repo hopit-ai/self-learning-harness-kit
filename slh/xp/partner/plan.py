@@ -5,7 +5,7 @@ Plan (``xp-partner-plan-v1``, self-hashed like ``slh.poc9.arms.freeze``)::
     {"schema", "phase", "plan_id", "seed", "tasks", "writers", "runs",
      "critic": {writer: "teacher"|"self"|"none"},
      "cases": {task: {split: {"file", "sha256", "rows"}}},
-     "arms": [{"name", "kind", "scope", "text"?, "n"?}],
+     "arms": [{"name", "kind", "scope", "text"? | "texts"?, "n"?}],
      "limits": {"case_limit_s", "max_output_tokens", "concurrency",
                 "export_cap_bytes", "max_shards"},
      "learning": {...loop settings...},
@@ -14,7 +14,9 @@ Plan (``xp-partner-plan-v1``, self-hashed like ``slh.poc9.arms.freeze``)::
 Arm kinds: ``b0`` (model only), ``notes`` (inline text, e.g. B1 = "" or the
 person-written procedure), ``learned`` / ``generic`` / ``full_context`` /
 ``search_control`` (texts the learning stage writes per task x run x writer),
-``best_of_n`` (``n`` candidates + pairwise selector on the B1 prompt).
+``best_of_n`` (``n`` candidates + pairwise selector on the B1 prompt). A shared
+``notes`` arm may carry one text per task (``texts``: the person-written procedure
+arm ``human``, a descriptive control: single pass on the test set, no learning).
 ``scope`` is ``shared`` (once per task) or ``writer`` (per task x run x writer).
 
 ``prompt_hash`` is the hash of what the agent is actually sent: the rendered
@@ -58,6 +60,23 @@ def _limits(tasks: int) -> dict[str, Any]:
             "max_shards": max(1, tasks)}
 
 
+def person_arm(texts: dict[str, str]) -> dict[str, Any]:
+    """The person-written procedure control: one shared notes arm, one text per task,
+    rendered where notes go (``slh.poc9.loader``). Appended after every other arm, so
+    no other arm's identity or rendered prompt changes."""
+    if not texts or any(not (t or "").strip() for t in texts.values()):
+        raise ValueError("the person-written arm needs a non-empty text per task")
+    return {"name": "human", "kind": "notes", "scope": "shared",
+            "texts": {k: texts[k].strip() for k in sorted(texts)}}
+
+
+def arm_text(arm: dict[str, Any], task: str) -> str:
+    """The inline text a shared notes arm renders for ``task``."""
+    if "texts" in arm:
+        return arm["texts"][task]
+    return arm.get("text", "")
+
+
 def default_arms(human_text: str = "", *, search_control: bool = True
                  ) -> list[dict[str, Any]]:
     """Plan v1.1 phase-1 arms (code rule and raw-excerpt controls added later)."""
@@ -93,6 +112,10 @@ def verify(plan: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"bad arm {arm}")
         if (arm["kind"] in WRITER_TEXT_KINDS) != (arm["scope"] == "writer"):
             raise ValueError(f"{arm['name']}: writer-text arms (and only they) are per writer")
+        if "texts" in arm and (arm["kind"] != "notes" or arm["scope"] != "shared"
+                               or "text" in arm or set(arm["texts"]) != set(plan["tasks"])):
+            raise ValueError(f"{arm['name']}: per-task texts need a shared notes arm "
+                             "with one text for every task")
     budgets = (plan.get("learning") or {}).get("budgets")
     if budgets is not None:
         check_budgets(budgets)
@@ -104,6 +127,23 @@ def verify(plan: dict[str, Any]) -> dict[str, Any]:
 # Rehearsal / dry-run smoke: fewer runs and test cases and a shorter lesson loop.
 # A runtime setting recorded in the run identity; the registered plan is unchanged.
 SMOKE = {"runs": 1, "cases": 6, "ops": {"max_steps": 2, "patience": 1}}
+# Phase-0 v2 settings (runtime, in the run identity; the plan is unchanged):
+# "measure": two runs, the full lesson loop, no test decisions (learning throughput with
+# the parallel pool, stopped at a wall-time cap); "slice": one run, the short loop, the
+# first 20 test cases per task through every arm (latency, tokens, context limits).
+SMOKES = {"smoke": SMOKE,
+          "measure": {"runs": 2, "cases": 0, "ops": {}},
+          "slice": {"runs": 1, "cases": 20, "ops": {"max_steps": 2, "patience": 1}}}
+
+
+def smoke_setting(name: str | bool | None) -> dict[str, Any] | None:
+    if not name:
+        return None
+    if name is True:
+        name = "smoke"
+    if name not in SMOKES:
+        raise ValueError(f"unknown smoke setting {name!r}")
+    return dict(SMOKES[name])
 
 
 def effective(plan: dict[str, Any], smoke: dict[str, Any] | None) -> dict[str, Any]:
@@ -186,7 +226,7 @@ def instances(plan: dict[str, Any], text_for: Any) -> list[dict[str, Any]]:
         if kind in WRITER_TEXT_KINDS:
             text = text_for(slot["task"], slot["run"], slot["writer"], kind) or ""
         else:
-            text = arm.get("text", "") if kind == "notes" else ""
+            text = arm_text(arm, slot["task"]) if kind == "notes" else ""
         out.append({**slot, "prompt_hash": prompt_hash(kind, text, arm.get("n")),
                     "skill_sha256": pc.sha_text(text) if text else None, "_text": text})
     return out

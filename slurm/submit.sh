@@ -15,7 +15,7 @@ KIT="${KIT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SITE_PY="${SITE_PY:-${HARNESS_PY:-$WORK/venv/bin/python}}"
 LEDGER="${LEDGER:-$WORK/phase1/gpu-hours.jsonl}"
 OUTPUT="$("$SITE_PY" "$KIT/slurm/xpsite.py" budget --file "$LEDGER" \
-  --cap "${GPU_HOURS_CAP:-240}" --gpus "${XP_GPUS:-8}" --max-s "${MAX_JOB_S:-172800}" \
+  --cap "${GPU_HOURS_CAP:-1600}" --gpus "${XP_GPUS:-8}" --max-s "${MAX_JOB_S:-172800}" \
   --min "${MIN_USEFUL_S:-7200}" --job submit)" || { echo "not submitting: $OUTPUT" >&2; exit 2; }
 BUDGET_S="$("$SITE_PY" -c 'import json,sys; print(json.loads(sys.argv[1])["budget_s"])' "$OUTPUT")"
 MINUTES=$(( BUDGET_S / 60 ))

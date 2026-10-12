@@ -28,4 +28,4 @@ commit. The cases under package/cases/ are derived from its retail domain data
     SOFTWARE.
 
 Models served by the job scripts (downloaded by you, not included): Qwen/Qwen3.5-9B
-and a Qwen3.5-397B-A17B FP8 checkpoint, under their own licences on Hugging Face.
+and the teacher named by the TEACHER_* settings, under their own licences on Hugging Face.

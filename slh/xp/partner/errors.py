@@ -31,7 +31,11 @@ class RunHalted(CreditHalt):
 
 
 _CASE_TYPES = ("CaseTimeLimit", "Timeout", "TimeoutError", "ReadTimeout", "JSONDecodeError",
-               "ContextLimitExceeded", "OpsParseError")
+               "ContextLimitExceeded", "ContextLengthError", "OpsParseError",
+               "DecisionGrowthLimit")
+# A request too long for the model: refused before sending (the runner's guard) or by
+# the server (HTTP 400 naming the context length). Always a per-case final row.
+_CONTEXT_TYPES = ("ContextLimitExceeded", "ContextLengthError")
 _CASE_WORDS = re.compile(r"timed out|timeout|context length|context window|max_model_len|"
                          r"malformed|could not parse|unparseable|invalid tool call", re.IGNORECASE)
 _HALT_WORDS = re.compile(r"spend|budget|\bcap\b|credit|api[ _-]?key|unauthori[sz]ed|forbidden|"
@@ -45,7 +49,8 @@ _HALT_TYPES = ("BudgetExceeded", "Overspend", "UnmeteredCall", "ServingWindowClo
                "ConnectionRefusedError", "URLError", "ImportError", "ModuleNotFoundError",
                "FileNotFoundError", "PermissionError", "KeyError", "ConnectTimeout",
                "ConnectTimeoutError", "NewConnectionError", "MaxRetryError")
-_CONTEXT = re.compile(r"context length|context window|max_model_len", re.IGNORECASE)
+_CONTEXT = re.compile(r"context length|context window|max_model_len|too many tokens|"
+                      r"prompt is too long|longer than the maximum", re.IGNORECASE)
 _STATUS = re.compile(r"\b(?:HTTP|status)[ :]*([45]\d\d)\b", re.IGNORECASE)
 
 
@@ -71,8 +76,12 @@ def classify(error: BaseException | str) -> tuple[str, str]:
     # any case-level class or wording, whatever order the message puts them in.
     if _HALT_WORDS.search(message):
         return "halt", "systematic"
+    # A request too long for the model (refused by our guard, or an HTTP 400 that
+    # names the context length): a per-case final row, never a halt.
+    if names & set(_CONTEXT_TYPES) or (400 in statuses and _CONTEXT.search(message)):
+        return "case", "context_limit"
     if _CONTEXT.search(message):
-        return "case", "context_length"
+        return "case", "context_limit"
     if names & set(_CASE_TYPES) or isinstance(error, json.JSONDecodeError) or \
             _CASE_WORDS.search(message):
         return "case", name

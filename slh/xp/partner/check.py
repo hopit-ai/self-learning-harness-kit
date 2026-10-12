@@ -19,7 +19,9 @@ Then: every arm instance must match the plan exactly (task, run, writer, arm,
 kind, n) and its prompt hash must be the one the plan text or the exported skill
 text renders to; duplicate identities fail; decisions join our key by case id
 with the same case_hash, must belong to a prompt some arm uses, and their arm
-label must be an instance with that prompt; answer signatures (exact gold
+label must be an instance with that prompt; failure rows are consistent (no
+halt-class error row, error and time-limit rows carry ``action = none`` and never
+score correct); learning summaries carry the registered critic and loop; answer signatures (exact gold
 argument sets of our test key) anywhere outside decision actions fail, as does a
 test case id in learning, skill or conversation rows or beside a ``kind``.
 
@@ -319,6 +321,42 @@ def _trace_ok(rows: list[dict[str, Any]], loop: str, proposals: int, where: str)
                                   "budget")
 
 
+CHECK_LABELS = {"teacher": "teacher-checked", "self": "self-checked", "none": "unchecked"}
+
+
+def check_label(critic: str, mode: str = "binding") -> str:
+    """The registered check label (= slh.xp.learn.loop.check_label)."""
+    if critic == "none":
+        return "unchecked"
+    return f"advisory-{critic}" if mode == "advisory" else CHECK_LABELS[critic]
+TIME_LIMIT = "case_time_limit"
+
+
+def verify_failure_row(row: dict[str, Any], where: str) -> bool:
+    """A decision row's failure fields (docs/xp/partner-package.md, section 5):
+    halt-class errors write no row; a case-level error or time-limit row has
+    ``action = none`` (scored incorrect); flags agree. Returns True for an
+    error row. Any contradiction fails the check."""
+    from slh.xp.partner.errors import classify
+
+    error, cls, limit = row.get("error"), row.get("error_class"), row["case_time_limit"]
+    if limit:
+        if error != TIME_LIMIT or cls != TIME_LIMIT:
+            raise CheckFailed(f"{where}: a time-limit row with error {error!r} / class {cls!r}")
+    elif error is None:
+        if cls is not None:
+            raise CheckFailed(f"{where}: an error class without an error")
+        return False
+    elif error == TIME_LIMIT or cls == TIME_LIMIT:
+        raise CheckFailed(f"{where}: a time-limit error without the time-limit flag")
+    elif classify(error)[0] == "halt":
+        raise CheckFailed(f"{where}: a halt-class error ({classify(error)[1]}) wrote a row; "
+                          "halts write none")
+    if row["action"].get("type") != "none":
+        raise CheckFailed(f"{where}: an error row carries an action")
+    return True
+
+
 SELECTION_REASONS = ("no sentinel split", "no accepted change", "selection budget too small")
 
 
@@ -412,8 +450,102 @@ def _sample_use(by: dict[str, list[dict[str, Any]]], s: dict[str, Any], ids: lis
                                       "registered sample")
 
 
+def verified_endpoint(shards: list[dict[str, Any]]) -> dict[str, Any]:
+    """The delivered serving settings, only after their fingerprint is recomputed and
+    equals both env.json's and the run identity's (every shard): anything derived from
+    them (max_model_len for the context budget) comes from verified settings."""
+    from slh.xp.partner.runner import endpoint_sha256
+
+    endpoint = None
+    for sh in shards:
+        env = sh.get("env") or {}
+        ep = env.get("endpoint")
+        if not isinstance(ep, dict):
+            raise CheckFailed(f"{sh['path']}: env.json has no serving settings")
+        fp = endpoint_sha256(ep)
+        if fp != env.get("endpoint_sha256") or \
+                fp != sh["hashes"]["run_identity"]["endpoint_sha256"]:
+            raise CheckFailed(f"{sh['path']}: serving settings do not match the run "
+                              "identity's fingerprint")
+        if endpoint is not None and ep != endpoint:
+            raise CheckFailed("shards report different serving settings")
+        endpoint = ep
+    return endpoint or {}
+
+
+_FIT_PARAMS: dict[tuple[str, str, int, int, int], dict[str, int]] = {}
+
+
+def verify_full_context(plan: dict[str, Any], rule: dict[str, Any], s: dict[str, Any],
+                        by: dict[str, list[dict[str, Any]]], ids: list[str], text: str, *,
+                        package: Path | None, endpoint: dict[str, Any] | None,
+                        where: str) -> None:
+    """The amendment-2 rule, recomputed from the delivery and our package with the
+    guard's accounting (slh.xp.partner.context): a receipt is required; the evidence is
+    whole episodes, a prefix of the run's registered training order, rebuilt from our
+    training cases and the delivered acquisition actions (outcomes and corrections
+    recomputed here); token count, budget and maximal inclusion recomputed."""
+    from slh.demo1.decide import render_transcript
+    from slh.xp.partner import context
+    from slh.xp.partner import corrections as xc
+    from slh.xp.score import score as xp_score
+
+    fc = s.get("full_context")
+    if fc is None:
+        raise CheckFailed(f"{where}: no full-context receipt (the plan registers the rule)")
+    if package is None:
+        raise CheckFailed("verifying the full-context rule needs the package (cases)")
+    task = s["task"]
+    acq = by.get("acquisition", [])
+    # Completeness: one acquisition decision for EVERY case of the registered sample,
+    # in its order (the registered acquisition budget covers the whole sample), so
+    # maximal inclusion is judged against the full sample.
+    if [r.get("case_id") for r in acq] != list(ids) or len(acq) != s["evidence_cases"] \
+            or fc["episodes_total"] != len(ids):
+        raise CheckFailed(f"{where}: full-context acquisition does not cover the registered "
+                          "sample in order")
+    pool = {c["case_id"]: c for c in pc.read_jsonl(
+        Path(package) / plan["cases"][task]["train"]["file"])}
+    blocks = []
+    for i, r in enumerate(acq, 1):
+        case = pool.get(r["case_id"])
+        if case is None:
+            raise CheckFailed(f"{where}: acquisition case {r['case_id']} not in the pool")
+        fb = {"action": r.get("action"), "score": xp_score(case, r.get("action")),
+              "correction": xc.explain(case, r.get("action"))}
+        blocks.append(f"Episode {i}:\n{render_transcript(case['messages'])}\n"
+                      + json.dumps(fb, sort_keys=True))
+    header = "Training histories and deterministic feedback:\n\n"
+    k = fc["episodes_included"]
+    if text != context.render_evidence(header, blocks, k):
+        raise CheckFailed(f"{where}: the full-context text is not the first {k} whole "
+                          "episodes of the registered order")
+    limit = context.max_model_len(endpoint)
+    max_output = int(plan["limits"]["max_output_tokens"])
+    key = (task, plan["sha256"], limit, max_output, int(rule.get("margin", context.MARGIN)),
+           int(rule.get("decision_growth", max_output)))
+    if key not in _FIT_PARAMS:
+        _FIT_PARAMS[key] = context.fit_parameters(
+            pc.read_jsonl(Path(package) / plan["cases"][task]["test"]["file"]),
+            limit=limit, max_output=key[3], margin=key[4], growth=key[5])
+    params = _FIT_PARAMS[key]
+    probe = pool[ids[0]]
+    used = context.prompt_tokens(text, probe, params)
+    want = {"tokens": used, **{n: params[n] for n in ("budget", "fixed_tokens", "limit",
+                                                       "max_output", "margin", "growth")}}
+    if any(fc[n] != v for n, v in want.items()):
+        raise CheckFailed(f"{where}: full-context receipt differs from the recomputation "
+                          f"{want}")
+    if k and used > params["budget"]:
+        raise CheckFailed(f"{where}: the full-context text does not fit the budget")
+    if k < len(blocks) and context.fits(context.render_evidence(header, blocks, k + 1),
+                                        probe, params):
+        raise CheckFailed(f"{where}: one more whole episode would fit (not maximal)")
+
+
 def verify_learning(plan: dict[str, Any], learning: list[dict[str, Any]],
-                    texts: dict[tuple[Any, ...], str]) -> None:
+                    texts: dict[tuple[Any, ...], str], *, package: Path | None = None,
+                    endpoint: dict[str, Any] | None = None) -> None:
     """Every delivered learning summary: typed schema, its own registered
     training sample, artifact hashes equal to the exported texts, sentinel
     selection consistent with them, budgets within the registered ones, and the
@@ -430,9 +562,22 @@ def verify_learning(plan: dict[str, Any], learning: list[dict[str, Any]],
         where = f"learning {task}/{writer}/run-{run}"
         if len(by.get("summary", [])) != 1:
             raise CheckFailed(f"{where}: no summary (or more than one)")
-        s = sc.check_object(where, by["summary"][0], sc.SUMMARY_FIELDS)
+        s = sc.check_object(where, by["summary"][0], sc.SUMMARY_FIELDS,
+                            optional=sc.SUMMARY_OPTIONAL)
         if (s["task"], s["run"], s["writer"]) != (task, run, writer):
             raise CheckFailed(f"{where}: summary names another run")
+        # Registered per-writer settings: critic, its check label and the loop.
+        critic = (plan.get("critic") or {}).get(writer, "none")
+        mode = (plan.get("learning") or {}).get("critic_mode", "binding")
+        if s.get("critic_mode", "binding") != mode:
+            raise CheckFailed(f"{where}: critic mode {s.get('critic_mode')!r} is not the "
+                              f"registered {mode!r}")
+        if s["critic"] != critic or s["check"] != check_label(critic, mode):
+            raise CheckFailed(f"{where}: critic {s['critic']!r} ({s['check']!r}) is not the "
+                              f"registered {critic!r}")
+        if s["loop"] != ("ops" if writer.endswith("+") else "note"):
+            raise CheckFailed(f"{where}: loop {s['loop']!r} is not the registered loop of "
+                              f"writer {writer}")
         ids = samples.get(task, {}).get("runs", {}).get(str(run))
         if ids is None or s["train_case_ids_sha256"] != pc.sha_text(pc.canonical(ids)) or \
                 s["train_cases"] != len(ids):
@@ -461,6 +606,13 @@ def verify_learning(plan: dict[str, Any], learning: list[dict[str, Any]],
                 raise CheckFailed(f"{where}: total {k} over the registered budget")
         if s["evidence_cases"] > used["acquisition"]["decisions"]:
             raise CheckFailed(f"{where}: full context counts more cases than it decided")
+        rule = (plan.get("learning") or {}).get("full_context")
+        if rule:
+            verify_full_context(plan, rule, s, by, ids, texts.get((task, run, writer,
+                                                                  "full_context")) or "",
+                                package=package, endpoint=endpoint, where=where)
+        elif s.get("full_context") is not None:
+            raise CheckFailed(f"{where}: a full-context receipt the plan does not register")
         main = "trace" if s["loop"] == "ops" else "patches"
         _trace_ok(by.get(main, []), s["loop"], s["proposals"], where)
         _trace_ok(by.get("search_trace", []), s["loop"], s["search_control"]["proposals"],
@@ -499,13 +651,16 @@ def _accuracy(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def check(exports: Path | list[Path], registration: dict[str, Any], keys: dict[str, Path], *,
           plan: dict[str, Any], membership: dict[str, Any], reveal_incomplete: bool = False,
-          allow_dry: bool = False, allow_smoke: bool = False) -> dict[str, Any]:
+          allow_dry: bool = False, allow_smoke: bool = False,
+          case_rows: bool = False, package: Path | None = None) -> dict[str, Any]:
+    """``case_rows`` (our analysis only; never in the written check report):
+    each revealed instance also carries its scored cases (``cases``)."""
     exports = [exports] if isinstance(exports, str | Path) else list(exports)
     report: dict[str, Any] = {"schema": "xp-partner-check-v2",
                               "exports": [str(e) for e in exports]}
     try:
         body = _check(exports, registration, keys, plan, membership, reveal_incomplete,
-                      allow_dry, allow_smoke)
+                      allow_dry, allow_smoke, case_rows, package)
     except (CheckFailed, sc.SchemaError) as exc:
         return {**report, "status": "failed", "reason": str(exc)}
     except (ValueError, KeyError, TypeError, OSError) as exc:  # malformed input: fail closed
@@ -513,44 +668,13 @@ def check(exports: Path | list[Path], registration: dict[str, Any], keys: dict[s
     return {**report, **body}
 
 
-def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[str, Path],
-           plan: dict[str, Any], membership: dict[str, Any], reveal_incomplete: bool,
-           allow_dry: bool, allow_smoke: bool = False) -> dict[str, Any]:
-    if plan is None or membership is None:
-        raise CheckFailed("the registered plan and our test membership are required")
-    pp.verify(plan)
-    if plan["sha256"] != registration.get("plan_sha256") or \
-            plan["plan_id"] != registration.get("plan_id"):
-        raise CheckFailed("the plan passed to the checker is not the registered plan")
-    if not exports:
-        raise CheckFailed("no export given")
-    members = load_membership(membership, registration, plan)
-    keys = load_keys(key_paths, members)
-    shards = [read_shard(e, registration, plan) for e in exports]
-    merged = merge(shards, registration, allow_dry=allow_dry)
-    smoke = shards[0]["hashes"]["run_identity"]["smoke"]
-    if smoke is not None:
-        if not allow_smoke:
-            raise CheckFailed("the delivery is a smoke run (rehearsal setting)")
-        if smoke != pp.SMOKE:
-            raise CheckFailed("unknown smoke setting")
-        members = {t: pp.smoke_ids(ids, smoke) for t, ids in members.items()}
-    plan = pp.effective(plan, smoke)  # registered plan already verified above
-    delivered = {t for s in shards for t in s["tasks"]}
-    test_ids = {cid for ids in members.values() for cid in ids}
-    kinds = {case["kind"] for key in keys.values() for case in key.values()}
-    extras = [(f"{s['path']}/env.json", s["env"]) for s in shards] + \
-        [(f"{s['path']}/manifest.json", s["manifest"]) for s in shards]
-    scan(merged, extras, signatures(keys), test_ids, kinds,
-         atoms_index(keys, membership.get("distinctive_addresses")))
-
-    arms = merged["arms.jsonl.gz"]
-    skills = merged["skills.jsonl.gz"]
-    learning = merged["learning.jsonl.gz"]
-    decisions = merged["decisions.jsonl.gz"]
-    gaps: list[dict[str, Any]] = [{"task": t, "problem": "task not delivered"}
-                                  for t in plan["tasks"] if t not in delivered]
-
+def learning_identity(plan: dict[str, Any], skills: list[dict[str, Any]],
+                      learning: list[dict[str, Any]], delivered: set[str],
+                      package: Path | None, endpoint: dict[str, Any]
+                      ) -> tuple[dict[tuple[Any, ...], str], list[dict[str, Any]]]:
+    """Key-free: skill texts (unique, planned, hashed) and learning provenance (one
+    summary per planned run of a delivered task, verified). Texts and gaps."""
+    gaps: list[dict[str, Any]] = []
     # skills: unique identities, hashes, planned learning runs only
     learn_slots = set(pp.learning_slots(plan))
     texts: dict[tuple[Any, ...], str] = {}
@@ -575,8 +699,16 @@ def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[st
     for t, r, w in sorted(learn_slots, key=str):
         if t in delivered and (t, r, w) not in summaries:
             gaps.append({"slot": [t, r, w], "problem": "learning provenance missing"})
-    verify_learning(plan, learning, texts)
+    verify_learning(plan, learning, texts, package=package, endpoint=endpoint)
+    return texts, gaps
 
+
+def arm_identity(plan: dict[str, Any], arms: list[dict[str, Any]],
+                 texts: dict[tuple[Any, ...], str], delivered: set[str]
+                 ) -> tuple[dict[tuple[Any, ...], dict[str, Any]], list[dict[str, Any]]]:
+    """Key-free: every arm instance exactly as registered (slot, kind, n, prompt and
+    skill hashes of its registered text). Instances by slot, and gaps."""
+    gaps: list[dict[str, Any]] = []
     # arms: exact match with the plan
     want = {pp.slot_key(s): s for s in pp.instance_slots(plan)}
     plan_arms = {a["name"]: a for a in plan["arms"]}
@@ -595,7 +727,8 @@ def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[st
             if text is None:
                 raise CheckFailed(f"no exported text for writer arm {k}")
         else:
-            text = plan_arms[a["arm"]].get("text", "") if spec["kind"] == "notes" else ""
+            text = pp.arm_text(plan_arms[a["arm"]], a["task"]) if spec["kind"] == "notes" \
+                else ""
         if pp.prompt_hash(spec["kind"], text, spec["n"]) != a["prompt_hash"] or \
                 a["skill_sha256"] != (pc.sha_text(text) if text else None):
             raise CheckFailed(f"arm instance {k}: prompt hash does not match its text")
@@ -603,6 +736,77 @@ def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[st
     for k in sorted(set(want) - set(slots), key=str):
         if k[0] in delivered:
             gaps.append({"slot": list(k), "problem": "arm instance missing"})
+    return slots, gaps
+
+
+def decision_identity(row: dict[str, Any], case_hashes: dict[str, dict[str, str]],
+                      by_prompt: dict[tuple[str, str], set[tuple[Any, ...]]],
+                      seen: set[tuple[str, str, str]]) -> None:
+    """A decision row's full identity (no answer key needed): a registered test case
+    with its registered case hash, a prompt some registered arm instance uses, the
+    row's arm label one of that prompt's instances, once per prompt. Shared by our
+    checker and the partner's completion check."""
+    task, cid = row["task"], row["case_id"]
+    want = (case_hashes.get(task) or {}).get(cid)
+    if want is None:
+        raise CheckFailed(f"{task}/{cid}: not a registered test case")
+    if row["case_hash"] != want:
+        raise CheckFailed(f"{task}/{cid}: case_hash differs from our answer key")
+    pkey = (task, row["prompt_hash"])
+    if pkey not in by_prompt:
+        raise CheckFailed(f"{task}/{cid}: decision for a prompt no arm uses")
+    if (task, row["run"], row["writer"], row["arm"]) not in by_prompt[pkey]:
+        raise CheckFailed(f"{task}/{cid}: arm label does not match its prompt hash")
+    if (task, row["prompt_hash"], cid) in seen:
+        raise CheckFailed(f"{task}/{cid}: duplicate decision for prompt "
+                          f"{row['prompt_hash'][:12]}")
+    seen.add((task, row["prompt_hash"], cid))
+
+
+def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[str, Path],
+           plan: dict[str, Any], membership: dict[str, Any], reveal_incomplete: bool,
+           allow_dry: bool, allow_smoke: bool = False, case_rows: bool = False,
+           package: Path | None = None) -> dict[str, Any]:
+    if plan is None or membership is None:
+        raise CheckFailed("the registered plan and our test membership are required")
+    pp.verify(plan)
+    if plan["sha256"] != registration.get("plan_sha256") or \
+            plan["plan_id"] != registration.get("plan_id"):
+        raise CheckFailed("the plan passed to the checker is not the registered plan")
+    if not exports:
+        raise CheckFailed("no export given")
+    members = load_membership(membership, registration, plan)
+    keys = load_keys(key_paths, members)
+    shards = [read_shard(e, registration, plan) for e in exports]
+    merged = merge(shards, registration, allow_dry=allow_dry)
+    smoke = shards[0]["hashes"]["run_identity"]["smoke"]
+    if smoke is not None:
+        if not allow_smoke:
+            raise CheckFailed("the delivery is a smoke run (rehearsal setting)")
+        if smoke not in pp.SMOKES.values():
+            raise CheckFailed("unknown smoke setting")
+        members = {t: pp.smoke_ids(ids, smoke) for t, ids in members.items()}
+    plan = pp.effective(plan, smoke)  # registered plan already verified above
+    delivered = {t for s in shards for t in s["tasks"]}
+    test_ids = {cid for ids in members.values() for cid in ids}
+    kinds = {case["kind"] for key in keys.values() for case in key.values()}
+    extras = [(f"{s['path']}/env.json", s["env"]) for s in shards] + \
+        [(f"{s['path']}/manifest.json", s["manifest"]) for s in shards]
+    scan(merged, extras, signatures(keys), test_ids, kinds,
+         atoms_index(keys, membership.get("distinctive_addresses")))
+
+    arms = merged["arms.jsonl.gz"]
+    skills = merged["skills.jsonl.gz"]
+    learning = merged["learning.jsonl.gz"]
+    decisions = merged["decisions.jsonl.gz"]
+    gaps: list[dict[str, Any]] = [{"task": t, "problem": "task not delivered"}
+                                  for t in plan["tasks"] if t not in delivered]
+
+    texts, more = learning_identity(plan, skills, learning, delivered, package,
+                                    verified_endpoint(shards))
+    gaps += more
+    slots, more = arm_identity(plan, arms, texts, delivered)
+    gaps += more
 
     # decisions
     by_prompt: dict[tuple[str, str], set[tuple[Any, ...]]] = defaultdict(set)
@@ -610,24 +814,19 @@ def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[st
         by_prompt[(a["task"], a["prompt_hash"])].add(k)
     scored: dict[tuple[str, str], dict[str, dict[str, Any]]] = defaultdict(dict)
     mismatches = []
+    case_hashes = {t: {cid: c["case_hash"] for cid, c in key.items()} for t, key in keys.items()}
+    seen: set[tuple[str, str, str]] = set()
     for row in decisions:
         task, cid = row["task"], row["case_id"]
-        case = keys[task].get(cid)
-        if case is None:
-            raise CheckFailed(f"{task}/{cid}: not a registered test case")
-        if row["case_hash"] != case["case_hash"]:
-            raise CheckFailed(f"{task}/{cid}: case_hash differs from our answer key")
+        decision_identity(row, case_hashes, by_prompt, seen)
+        case = keys[task][cid]
         pkey = (task, row["prompt_hash"])
-        if pkey not in by_prompt:
-            raise CheckFailed(f"{task}/{cid}: decision for a prompt no arm uses")
-        if (task, row["run"], row["writer"], row["arm"]) not in by_prompt[pkey]:
-            raise CheckFailed(f"{task}/{cid}: arm label does not match its prompt hash")
         bucket = scored[pkey]
-        if cid in bucket:
-            raise CheckFailed(f"{task}/{cid}: duplicate decision for prompt "
-                              f"{row['prompt_hash'][:12]}")
+        failed = verify_failure_row(row, f"{task}/{cid}")
         score_fn, _ = pc.scorer(task, case)
         s = score_fn(case, row["action"])
+        if failed and s["correct"]:
+            raise CheckFailed(f"{task}/{cid}: an error row scores as correct")
         if "reported_correct" in row and bool(row["reported_correct"]) != bool(s["correct"]):
             mismatches.append({"task": task, "case_id": cid})
         bucket[cid] = {"case_id": cid, "group": case["group"], "kind": case["kind"],
@@ -657,6 +856,9 @@ def _check(exports: list[Path], registration: dict[str, Any], key_paths: dict[st
             first = keys[a["task"]][members[a["task"]][0]]
             _, summarize = pc.scorer(a["task"], first)
             entry["summary"] = summarize([r["score"] for r in rows], [r["kind"] for r in rows])
+            if case_rows:
+                entry["cases"] = [{"case_id": r["case_id"], "group": r["group"],
+                                   "kind": r["kind"], **r["score"]} for r in rows]
         instances.append(entry)
     pooled = []
     if reveal:
@@ -688,6 +890,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path)
     ap.add_argument("--reveal-incomplete", action="store_true")
     ap.add_argument("--allow-dry-run", action="store_true")
+    ap.add_argument("--package", type=Path,
+                    help="the package directory (cases); default: the plan's directory")
     ap.add_argument("--allow-smoke", action="store_true",
                     help="accept a rehearsal smoke run (plan.SMOKE coverage)")
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
@@ -698,7 +902,8 @@ def main(argv: list[str] | None = None) -> int:
     report = check(args.export, pc.read_json(args.registration), keys,
                    plan=pc.read_json(args.plan), membership=pc.read_json(args.membership),
                    reveal_incomplete=args.reveal_incomplete, allow_dry=args.allow_dry_run,
-                   allow_smoke=args.allow_smoke)
+                   allow_smoke=args.allow_smoke,
+                   package=args.package or args.plan.parent)
     out = args.out or args.export[0].parent / "check-report.json"
     pc.write_json(out, report)
     print(json.dumps({k: report.get(k) for k in ("status", "reason", "decision_rows",

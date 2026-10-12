@@ -221,19 +221,54 @@ def agent_argv(model, port, tp, dp, util, max_num_seqs):
     _set(argv, "--tensor-parallel-size", tp)
     if int(dp) > 1:
         _set(argv, "--data-parallel-size", dp)
+    for flag in SPEED_ARGS:
+        if flag not in argv:
+            argv.append(flag)
     return argv
 
 
-def teacher_argv(model, name, port, tp, util, max_len, eager, extra):
+# Prefill speed for repeated long prompts (phase 0: teacher prefill ~1,200 tok/s with
+# writers resending long evidence): cache shared prefixes and chunk long prefills so
+# concurrent learning units batch. Output-neutral serving settings.
+SPEED_ARGS = ["--enable-prefix-caching", "--enable-chunked-prefill"]
+
+
+def teacher_argv(model, name, port, tp, util, max_len, eager, extra, expert_parallel=False,
+                 max_batched_tokens=0):
     argv = ["vllm", "serve", model, "--served-model-name", name,
             "--tensor-parallel-size", str(tp), "--max-model-len", str(max_len),
             "--gpu-memory-utilization", str(util), "--generation-config", "vllm",
             "--reasoning-parser", "qwen3",
             "--default-chat-template-kwargs", json.dumps({"enable_thinking": False}),
-            "--host", "127.0.0.1", "--port", str(port), "--uvicorn-log-level", "warning"]
+            "--host", "127.0.0.1", "--port", str(port), "--uvicorn-log-level", "warning",
+            *SPEED_ARGS]
+    if int(max_batched_tokens or 0) > 0:
+        argv += ["--max-num-batched-tokens", str(int(max_batched_tokens))]
     if eager:
         argv.append("--enforce-eager")  # reference incident: 27 min graph capture
-    return argv + [a for a in (extra or "").split() if a]
+    if expert_parallel:
+        argv.append("--enable-expert-parallel")  # MoE experts split across the GPUs
+    tokens = list(extra) if isinstance(extra, (list, tuple)) else (extra or "").split()
+    extra = [a for a in tokens if a and not
+             (expert_parallel and a == "--enable-expert-parallel")]
+    return argv + extra
+
+
+def extra_args(text, json_text=""):
+    """Extra serving flags: ``json_text`` (a JSON array of strings, e.g.
+    TEACHER_EXTRA_ARGS_JSON) when given, replacing ``text``; else ``text`` split on
+    whitespace without a shell (so ``--engram-config={"cpu_offload":false}`` is one
+    token as written). Returned verbatim; anything else refuses."""
+    if (json_text or "").strip():
+        try:
+            value = json.loads(json_text)
+        except ValueError as exc:
+            raise SystemExit("extra args JSON is not valid JSON: %s" % exc)
+        if not isinstance(value, list) or not all(isinstance(a, str) and a.strip()
+                                                  for a in value):
+            raise SystemExit("extra args JSON must be an array of non-empty strings")
+        return value
+    return (text or "").split()
 
 
 def cmd_agent_argv(args):
@@ -257,7 +292,9 @@ def cmd_endpoint_argv(args):
 
 def cmd_teacher_argv(args):
     print("\n".join(teacher_argv(args.model, args.name, args.port, args.tp, args.util,
-                                 args.max_len, args.eager == "1", args.extra)))
+                                 args.max_len, args.eager == "1",
+                                 extra_args(args.extra, args.extra_json),
+                                 args.expert_parallel == "1", args.max_batched_tokens)))
     return 0
 
 
@@ -376,19 +413,45 @@ def probe(args):
     return 0 if len(ok) == args.requests else 1
 
 
-SERVE_ENV_PREFIXES = ("VLLM_", "NCCL_", "TORCH_NCCL_", "PYTORCH_", "HF_HUB_", "CUDA_LAUNCH_")
+# Allowlist by prefix: every variable family that can change numerics, threading,
+# kernels or communication of the servers.
+SERVE_ENV_PREFIXES = (
+    "VLLM_", "TORCH", "PYTORCH_", "CUDA_", "CUBLAS", "CUDNN_", "NVIDIA_", "NCCL_", "NVTE_",
+    "TRITON_", "XFORMERS_", "FLASHINFER_", "FLASH_ATTENTION", "OMP_", "KMP_", "GOMP_",
+    "MKL_", "OPENBLAS_", "BLIS_", "VECLIB_", "NUMEXPR_", "TOKENIZERS_", "TRANSFORMERS_",
+    "HF_", "HUGGINGFACE_", "SAFETENSORS_", "RAY_", "UCX_", "FI_", "GLOO_", "MASTER_",
+    "LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONHASHSEED", "XLA_")
 SERVE_ENV_NAMES = ("SERVE_CPUS", "XP_GPUS")
-SERVE_ENV_VOLATILE = frozenset({"VLLM_API_KEY", "VLLM_RPC_BASE_PATH"})  # per job
+# Per-job values only: the bearer token, the socket directory; and anything secret.
+SERVE_ENV_VOLATILE = frozenset({"VLLM_API_KEY", "VLLM_RPC_BASE_PATH", "RAY_TMPDIR"})
+# Locations and diagnostics, not behaviour: cache, temp, log, debug and trace paths
+# (phase 0: VLLM_CACHE_ROOT and TORCH_NCCL_DEBUG_INFO_TEMP_FILE named the job, which
+# would have refused every resume in a new job).
+_LOCATION = re.compile(r"CACHE|TMP|TEMP|_LOG|LOGGING|DEBUG|TRACE|DUMP|PROFIL", re.IGNORECASE)
+_SECRET = re.compile(r"(^|_)(TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|KEY|CREDENTIALS?)(_|$)",
+                     re.IGNORECASE)
+
+
+def _file_sha256(path):
+    """SHA-256 of a launcher (VLLM_BIN may be a wrapper script): part of the identity."""
+    import hashlib
+    try:
+        p = Path(shutil.which(path) or path) if path else None
+        return hashlib.sha256(p.read_bytes()).hexdigest() if p and p.is_file() else None
+    except OSError:
+        return None
 
 
 def serve_env(env=None):
-    """Every environment setting the servers see that can change their behaviour
-    (vLLM, NCCL, torch and hub variables, CPUs and GPUs per step); per-job values
-    (the bearer token, the socket directory) excluded."""
+    """Every environment setting the servers see that can change their behaviour:
+    numerics and precision (TORCH_ALLOW_TF32*, CUBLAS*, NVIDIA_TF32_OVERRIDE ...),
+    threading (OMP_, MKL_, ...), kernels and caches, communication, CPUs and GPUs per
+    step. Excluded only: per-job values (token, socket directory) and secrets."""
     env = os.environ if env is None else env
     return {k: v for k, v in sorted(env.items())
             if (k.startswith(SERVE_ENV_PREFIXES) or k in SERVE_ENV_NAMES)
-            and k not in SERVE_ENV_VOLATILE}
+            and k not in SERVE_ENV_VOLATILE and not _SECRET.search(k)
+            and not _LOCATION.search(k)}
 
 
 def _models(path):
@@ -400,12 +463,53 @@ def _models(path):
             for k, v in sorted(data.items()) if isinstance(v, dict)}
 
 
+METRICS = {"prompt_tokens": "vllm:prompt_tokens_total",
+           "generation_tokens": "vllm:generation_tokens_total",
+           "requests": "vllm:request_success_total",
+           "running": "vllm:num_requests_running",
+           "prefix_hits": "vllm:prefix_cache_hits_total",
+           "prefix_queries": "vllm:prefix_cache_queries_total"}
+
+
+def parse_metrics(text):
+    """Sum every label variant of the vLLM metrics we use (Prometheus text format)."""
+    out = {}
+    for line in (text or "").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        name = line.split("{", 1)[0].split(" ", 1)[0]
+        for key, metric in METRICS.items():
+            if name in (metric, metric.replace("_total", "")):
+                try:
+                    out[key] = out.get(key, 0.0) + float(line.rsplit(" ", 1)[1])
+                except ValueError:
+                    pass
+    return out
+
+
+def sample_metrics(args):
+    """Append one row per interval with the server's counters (until killed or
+    ``until``): the phase-0 throughput, concurrency and prefix-cache measurements."""
+    url = "http://127.0.0.1:%s/metrics" % args.port
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    while not args.until or time.time() < args.until:
+        try:
+            row = {"t": time.time(), "name": args.name, **parse_metrics(_get(url)[1])}
+        except Exception as exc:  # noqa: BLE001 - recorded, the sampler keeps going
+            row = {"t": time.time(), "name": args.name, "error": str(exc)[:200]}
+        with open(args.out, "a") as f:
+            f.write(json.dumps(row, sort_keys=True) + "\n")
+        time.sleep(args.interval)
+    return 0
+
+
 def endpoint(args):
     """The runner's endpoint file. Deterministic for a given site setting (the
     run identity includes it, so a resubmitted job must write the same file)."""
     spec = _serve_spec()
     agent_dir = os.path.realpath(args.agent_model_dir)  # resolves to snapshots/<revision>
     teacher_dir = os.path.realpath(args.teacher_model_dir) if args.teacher == "1" else None
+    teacher_extra = extra_args(args.teacher_extra, args.teacher_extra_json)
     data = {
         "base_url": f"http://127.0.0.1:{args.agent_port}/v1",
         "model": spec["served_model_name"], "api_key_env": args.key_env,
@@ -414,6 +518,8 @@ def endpoint(args):
         "serving_args": agent_argv(agent_dir, args.agent_port, args.agent_tp,
                                    args.agent_dp, args.agent_util, args.agent_max_num_seqs),
         "replicas": int(args.agent_dp), "concurrency": int(args.concurrency),
+        # Scheduling only (not in the run identity): learning units run concurrently.
+        "learning_units": int(args.learning_units),
         "teacher": None,
         # Every other execution setting (run identity: a resume refuses any change).
         "execution": {
@@ -423,11 +529,18 @@ def endpoint(args):
             "teacher_model_dir": teacher_dir,
             "models": _models(args.download),
             "serve_env": serve_env(),
+            # the extra flags exactly as given (TEACHER_EXTRA_ARGS[_JSON]), verbatim
+            "teacher_extra_args": teacher_extra if args.teacher == "1" else None,
             "teacher_argv": teacher_argv(teacher_dir, args.teacher_name,
                                          args.teacher_port, args.teacher_tp,
                                          args.teacher_util, args.teacher_max_len,
-                                         args.teacher_eager == "1", args.teacher_extra)
-            if args.teacher == "1" else None},
+                                         args.teacher_eager == "1", teacher_extra,
+                                         args.teacher_expert_parallel == "1",
+                                         args.teacher_max_batched_tokens)
+            if args.teacher == "1" else None,
+            "vllm_bin_sha256": _file_sha256(args.vllm_bin),
+            # The phase gate this run was started under (run_all.sh): identity.
+            "gate_sha256": args.gate_sha or None},
     }
     if args.teacher == "1":
         data["teacher"] = {
@@ -480,9 +593,15 @@ def ledger(args):
         if args.action == "check":
             print(json.dumps({"gpu_hours_used": round(used, 2), "cap": args.cap}))
             return 2 if args.cap and used >= args.cap else 0
-        epoch = time.time() + (END_MARGIN_S if args.action == "end" else 0)
-        _append(path, {"event": args.action, "job": args.job, "epoch": epoch, "utc": now(),
-                       "gpus": args.gpus, "limit_s": args.limit_s})
+        epoch = time.time() + (END_MARGIN_S if args.action in ("end", "charge") else 0)
+        if args.action == "charge" and args.until:  # provisional: covers cleanup ahead
+            epoch = float(args.until) + END_MARGIN_S
+        row = {"event": args.action, "job": args.job, "epoch": epoch, "utc": now(),
+               "gpus": args.gpus, "limit_s": args.limit_s}
+        if args.action == "charge":  # refused or failed admission: setup and archive
+            row["start_epoch"] = float(args.start or os.environ.get("SLURM_JOB_START_TIME")
+                                       or epoch)
+        _append(path, row)
     print(json.dumps({"gpu_hours_used_before": round(used, 2)}))
     return 0
 
@@ -526,13 +645,17 @@ def ledger_used(path, job=None):
     rows = []
     if Path(path).is_file():
         rows = [json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
-    used, starts = 0.0, {}
+    used, starts, charges = 0.0, {}, {}
     for r in rows:
-        if r["event"] == "start":
+        if r["event"] == "charge":  # never admitted: the LAST charge row per job counts
+            charges[r["job"]] = r
+        elif r["event"] == "start":
             starts[r["job"]] = r
         elif r["event"] == "end" and r["job"] in starts:
             s = starts.pop(r["job"])
             used += max(0.0, r["epoch"] - s["epoch"]) / 3600 * s["gpus"]
+    used += sum(max(0.0, r["epoch"] - r["start_epoch"]) / 3600 * r["gpus"]
+                for r in charges.values())
     open_jobs = [s for s in starts.values() if s["job"] != job]
     used += sum(s["gpus"] * s.get("limit_s", 0) / 3600 for s in open_jobs)
     return used, [s["job"] for s in open_jobs]
@@ -577,53 +700,195 @@ def check_version(args):
 
 # --------------------------------------------------------------------------- collect
 
+class _Deadline(Exception):
+    pass
+
+
+class _Timed:
+    """File reader that stops at the deadline: the rest of the member is padded
+    with zeros (fast), so the tar stays valid, and the cut is recorded."""
+
+    def __init__(self, handle, size, deadline):
+        self.handle, self.left, self.deadline, self.cut = handle, size, deadline, False
+
+    def read(self, n=-1):
+        n = self.left if n is None or n < 0 else min(n, self.left)
+        if n <= 0:
+            return b""
+        if self.cut or (self.deadline and time.time() > self.deadline):
+            self.cut = True
+            data = b"\0" * n
+        else:
+            data = self.handle.read(n)
+            data += b"\0" * (n - len(data))  # a file that shrank meanwhile
+        self.left -= len(data)
+        return data
+
+
+class _Prefixed:
+    """A fixed prefix, then a _Timed reader."""
+
+    def __init__(self, head, timed):
+        self.head, self.timed = head, timed
+
+    def read(self, n=-1):
+        if self.head:
+            if n is None or n < 0 or n >= len(self.head):
+                head, self.head = self.head, b""
+                rest = self.timed.read(-1 if n is None or n < 0 else n - len(head))
+                return head + rest
+            head, self.head = self.head[:n], self.head[n:]
+            return head
+        return self.timed.read(n)
+
+
+def run_bounded(args):
+    """Run CMD in its own process group; at ``seconds``, and again after it ends, stop
+    the whole group: TERM, ``grace`` seconds, KILL; return only when the group is
+    empty (exit 124 on timeout, else CMD's code)."""
+    import signal
+
+    cmd = args.command[1:] if args.command[:1] == ["--"] else args.command
+    proc = subprocess.Popen(cmd, start_new_session=True)
+    pgid = proc.pid
+    timed_out = False
+    try:
+        rc = proc.wait(timeout=max(1, args.seconds))
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        rc = 124
+
+    def group_alive():
+        try:
+            os.killpg(pgid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    if group_alive():
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pgid, signal.SIGTERM)
+        end = time.time() + args.grace
+        while group_alive() and time.time() < end:
+            proc.poll()
+            time.sleep(0.2)
+        if group_alive():
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(pgid, signal.SIGKILL)
+        end = time.time() + 10
+        while group_alive() and time.time() < end:
+            proc.poll()
+            time.sleep(0.2)
+    proc.poll()
+    if group_alive():
+        print("run-bounded: process group %d survived KILL" % pgid, file=sys.stderr)
+        return 125
+    return 124 if timed_out else rc
+
+
+def run_locked(args):
+    """Run CMD while holding an exclusive lock on ``lock`` (single writer for the
+    phase-1 submission: the gate job and run_all.sh never submit twice)."""
+    cmd = args.command[1:] if args.command[:1] == ["--"] else args.command
+    Path(args.lock).parent.mkdir(parents=True, exist_ok=True)
+    with open(args.lock, "a+") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            return subprocess.call(cmd)
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def job_limit(args):
+    """This job's Slurm time limit in seconds (scontrol TimeLimit), -1 if unknown."""
+    job = os.environ.get("SLURM_JOB_ID")
+    rec = parse_scontrol(run(["scontrol", "show", "job", job])["out"]) if job else {}
+    left = parse_slurm_duration(rec.get("TimeLimit", ""))
+    print(-1 if left is None else left)
+    return 0
+
+
 def collect(args):
-    """A small archive to send back: whole small files, the last 2 MB of logs,
-    the export directory as is; refuses above 100 MB."""
+    """A small archive to send back: whole small files, the last 2 MB of logs, the
+    export directory as is; refuses above ``cap``. With ``deadline`` (epoch) the
+    deadline holds during enumeration AND copying: files not reached are left out,
+    a file being copied is cut (zero-padded), and TRUNCATED.txt says what happened."""
+    import io
+
     out = Path(args.out)
-    total = 0
-    members = []
-    for spec in args.include:
-        root = Path(spec)
-        if not root.exists():
-            continue
-        files = [root] if root.is_file() else sorted(p for p in root.rglob("*") if p.is_file())
-        for p in files:
-            if p.name.endswith((".lock", ".tmp")) or "__pycache__" in p.parts:
+    deadline = args.deadline or 0.0
+    total, members, notes = 0, [], []
+
+    def late():
+        return deadline and time.time() > deadline
+
+    try:
+        for spec in args.include:
+            root = Path(spec)
+            if not root.exists():
                 continue
-            arc = os.path.join(args.name, root.name,
-                               os.path.relpath(str(p), str(root))) if root.is_dir() \
-                else os.path.join(args.name, p.name)
-            size = p.stat().st_size
-            tail = p.suffix in (".log", ".out", ".err") and size > LOG_TAIL_BYTES
-            members.append((p, os.path.normpath(arc), tail))
-            total += min(size, LOG_TAIL_BYTES) if tail else size
+            walker = [root] if root.is_file() else (p for p in root.rglob("*"))
+            for p in walker:
+                if late():
+                    raise _Deadline("enumeration")
+                if not p.is_file() or p.name.endswith((".lock", ".tmp")) or \
+                        "__pycache__" in p.parts:
+                    continue
+                arc = os.path.join(args.name, root.name,
+                                   os.path.relpath(str(p), str(root))) if root.is_dir() \
+                    else os.path.join(args.name, p.name)
+                size = p.stat().st_size
+                tail = p.suffix in (".log", ".out", ".err") and size > LOG_TAIL_BYTES
+                members.append((p, os.path.normpath(arc), tail))
+                total += min(size, LOG_TAIL_BYTES) if tail else size
+    except _Deadline:
+        notes.append("enumeration stopped at the deadline (%d files listed)" % len(members))
     if total > args.cap:
         print("refused: %d bytes > %d" % (total, args.cap), file=sys.stderr)
         return 2
     out.parent.mkdir(parents=True, exist_ok=True)
-    import io
+    members.sort(key=lambda m: m[1])
+    done = 0
     with tarfile.open(str(out), "w:gz") as tar:
         for p, arc, tail in members:
-            if args.deadline and time.time() > args.deadline:
-                skipped = len(members) - members.index((p, arc, tail))
-                note = ("archive cut at the budget deadline; %d files left out\n"
-                        % skipped).encode()
-                info = tarfile.TarInfo(os.path.join(args.name, "TRUNCATED.txt"))
-                info.size, info.mtime, info.mode = len(note), int(time.time()), 0o644
-                tar.addfile(info, io.BytesIO(note))
+            if late():
+                notes.append("%d of %d files left out at the deadline"
+                             % (len(members) - done, len(members)))
                 break
-            if tail:
+            try:
                 with p.open("rb") as f:
-                    f.seek(-LOG_TAIL_BYTES, 2)
-                    data = b"[... truncated to the last 2 MB ...]\n" + f.read()
-                info = tarfile.TarInfo(arc)
-                info.size, info.mtime, info.mode = len(data), int(p.stat().st_mtime), 0o644
-                tar.addfile(info, io.BytesIO(data))
-            else:
-                tar.add(str(p), arcname=arc, recursive=False)
-    print(json.dumps({"archive": str(out), "files": len(members),
-                      "bytes": out.stat().st_size}))
+                    if tail:
+                        f.seek(-LOG_TAIL_BYTES, 2)
+                        head = b"[... truncated to the last 2 MB ...]\n"
+                        timed = _Timed(f, LOG_TAIL_BYTES, deadline)  # same deadline
+                        info = tarfile.TarInfo(arc)
+                        info.size, info.mtime, info.mode = len(head) + LOG_TAIL_BYTES, \
+                            int(p.stat().st_mtime), 0o644
+                        tar.addfile(info, _Prefixed(head, timed))
+                        if timed.cut:
+                            notes.append("%s cut at the deadline (zero-padded)" % arc)
+                            done += 1
+                            break
+                    else:
+                        info = tar.gettarinfo(str(p), arcname=arc)
+                        timed = _Timed(f, info.size, deadline)
+                        tar.addfile(info, timed)
+                        if timed.cut:
+                            notes.append("%s cut at the deadline (zero-padded)" % arc)
+                            done += 1
+                            break
+            except OSError as exc:
+                notes.append("%s unreadable: %s" % (arc, exc))
+            done += 1
+        if notes:
+            note = ("archive incomplete:\n" + "\n".join(notes) + "\n").encode()
+            info = tarfile.TarInfo(os.path.join(args.name, "TRUNCATED.txt"))
+            info.size, info.mtime, info.mode = len(note), int(time.time()), 0o644
+            tar.addfile(info, io.BytesIO(note))
+    print(json.dumps({"archive": str(out), "files": done, "bytes": out.stat().st_size,
+                      "complete": not notes}))
     return 0
 
 
@@ -642,7 +907,9 @@ def main(argv=None):
         p.add_argument("--" + k, default=d, required=d is None)
     p = sub.add_parser("teacher-argv")
     for k, d in (("model", None), ("name", None), ("port", "8002"), ("tp", "8"),
-                 ("util", "0.74"), ("max-len", "131072"), ("eager", "1"), ("extra", "")):
+                 ("util", "0.68"), ("max-len", "131072"), ("eager", "1"), ("extra", ""),
+                 ("extra-json", ""),
+                 ("expert-parallel", "0"), ("max-batched-tokens", "0")):
         p.add_argument("--" + k, default=d, required=d is None)
     p = sub.add_parser("endpoint-argv")
     p.add_argument("--endpoint", required=True)
@@ -672,13 +939,25 @@ def main(argv=None):
                  ("teacher-port", "8002"), ("teacher-name", "teacher"),
                  ("teacher-repo", ""), ("teacher-revision", ""), ("teacher-tp", "8"),
                  ("teacher-util", "0.74"), ("teacher-max-len", "131072"),
-                 ("teacher-eager", "1"), ("teacher-extra", ""), ("serve-mode", "container"),
+                 ("teacher-eager", "1"), ("teacher-extra", ""), ("teacher-extra-json", ""),
+                 ("serve-mode", "container"),
                  ("image", ""), ("vllm-bin", ""), ("agent-model-dir", "."),
                  ("teacher-model-dir", "."), ("serve-launch", "auto"), ("pyxis-flags", ""),
-                 ("download", "")):
+                 ("download", ""), ("teacher-expert-parallel", "0"), ("learning-units", "12"),
+                 ("gate-sha", ""),
+                 ("teacher-max-batched-tokens", "0")):
         p.add_argument("--" + k, default=d, required=k == "out")
+    p = sub.add_parser("sample-metrics")
+    p.add_argument("--name", required=True)
+    p.add_argument("--port", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--interval", type=float, default=30.0)
+    p.add_argument("--until", type=float, default=0.0)
     p = sub.add_parser("ledger")
-    p.add_argument("action", choices=("start", "end", "check"))
+    p.add_argument("action", choices=("start", "end", "check", "charge"))
+    p.add_argument("--start", type=float, help="charge: the allocation's start epoch")
+    p.add_argument("--until", type=float,
+                   help="charge: provisional end epoch (a later charge row replaces it)")
     p.add_argument("--file", required=True)
     p.add_argument("--job", default=os.environ.get("SLURM_JOB_ID", "local"))
     p.add_argument("--gpus", type=int, default=8)
@@ -693,6 +972,14 @@ def main(argv=None):
     p.add_argument("--max-s", type=int, default=0)
     p.add_argument("--reserve", type=int, default=1200)
     p.add_argument("--min", type=int, default=7200)
+    p = sub.add_parser("run-locked")
+    p.add_argument("--lock", required=True)
+    p.add_argument("command", nargs=argparse.REMAINDER)
+    sub.add_parser("job-limit")
+    p = sub.add_parser("run-bounded")
+    p.add_argument("--seconds", type=float, required=True)
+    p.add_argument("--grace", type=float, default=20.0)
+    p.add_argument("command", nargs=argparse.REMAINDER)
     p = sub.add_parser("admit")
     p.add_argument("--file", required=True)
     p.add_argument("--cap", type=float, required=True)
@@ -721,7 +1008,9 @@ def main(argv=None):
         print("1" if in_step() else "0")
         return 0
     return {"agent-argv": cmd_agent_argv, "endpoint-argv": cmd_endpoint_argv, "teacher-argv": cmd_teacher_argv, "wait": wait,
-            "probe": probe, "endpoint": endpoint, "ledger": ledger, "budget": budget, "admit": admit,
+            "probe": probe, "endpoint": endpoint, "ledger": ledger, "budget": budget, "admit": admit, "run-bounded": run_bounded, "run-locked": run_locked,
+            "job-limit": job_limit,
+            "sample-metrics": sample_metrics,
             "check-version": check_version,
             "collect": collect}[args.cmd](args) if args.cmd else (ap.print_help() or 2)
 

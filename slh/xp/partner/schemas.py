@@ -178,14 +178,15 @@ def _types(name: str, row: dict[str, Any], checks: dict[str, Check]) -> None:
 
 
 def check_object(name: str, value: Any, fields: dict[str, Check], *,
-                 required: bool = True) -> dict[str, Any]:
+                 required: bool = True, optional: tuple[str, ...] = ()) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SchemaError(f"{name}: not an object")
     unknown = set(value) - set(fields)
     if unknown:
         raise SchemaError(f"{name}: unknown fields {sorted(unknown)}")
-    if required and set(fields) - set(value):
-        raise SchemaError(f"{name}: missing {sorted(set(fields) - set(value))}")
+    missing = set(fields) - set(value) - set(optional)
+    if required and missing:
+        raise SchemaError(f"{name}: missing {sorted(missing)}")
     _types(name, value, fields)
     return value
 
@@ -254,4 +255,16 @@ SUMMARY_FIELDS: dict[str, Check] = {
     "budgets": _budgets, "evidence_cases": integer, "skill_sha256": opt(hex64),
     "generic_sha256": opt(hex64), "evidence_sha256": hex64,
     "search_control_sha256": opt(hex64), "skill_tokens": integer, "generic_ok": boolean,
-    "generic_problems": str_list}
+    "generic_problems": str_list,
+    # Amendment-2 rule (proposed): whole episodes that fit the 9B context budget.
+    "full_context": lambda v: isinstance(v, dict) and
+    set(v) == {"episodes_total", "episodes_included", "tokens", "budget", "fixed_tokens",
+               "limit", "max_output", "margin", "growth"} and
+    all(integer(x) for x in v.values()) and v["episodes_included"] <= v["episodes_total"]
+    and (v["tokens"] <= v["budget"] or v["episodes_included"] == 0),
+    "case_errors": lambda v: isinstance(v, dict) and all(
+        isinstance(k, str) and integer(x) for k, x in v.items())}
+SUMMARY_FIELDS["critic_mode"] = one_of("binding", "advisory")
+SUMMARY_FIELDS["critic_would_have_blocked"] = lambda v: isinstance(v, dict) and \
+    set(v) == {"learned", "search_control"} and all(integer(x) for x in v.values())
+SUMMARY_OPTIONAL = ("full_context", "critic_mode", "critic_would_have_blocked", "case_errors")

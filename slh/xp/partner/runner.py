@@ -120,7 +120,8 @@ class EndpointDecider:
     Best-of-n: n candidates (first greedy, then temperature ``SAMPLE_TEMPERATURE``)
     and a pairwise selector, as POC 9. Not run against a live endpoint here."""
 
-    def __init__(self, endpoint: dict[str, Any], *, seed: int, max_output_tokens: int) -> None:
+    def __init__(self, endpoint: dict[str, Any], *, seed: int, max_output_tokens: int,
+                 margin: int | None = None, growth: int | None = None) -> None:
         import yaml
 
         from slh.budget import ModelConfig
@@ -136,8 +137,16 @@ class EndpointDecider:
         self.decide_mod = decide
         self.client = decide.AgentClient(config)
         self.sampler = self.client.with_temperature(decide.SAMPLE_TEMPERATURE)
+        from slh.xp.partner import context
+
+        # Every 9B request is counted first: over max_model_len it is refused before
+        # sending (a per-case context_limit row), never sent and never a halt.
+        self.context_guard = context.make_guard(
+            context.max_model_len(endpoint), margin=context.MARGIN if margin is None else margin,
+            growth=growth)
         for c in (self.client, self.sampler):
             c.model = dataclasses.replace(c.model, max_tokens=int(max_output_tokens))
+            context.install(c, self.context_guard)
 
     def decide(self, question: dict[str, Any], unit: dict[str, Any], *, seed: int,
                deadline: float) -> dict[str, Any]:
@@ -316,8 +325,53 @@ def env_report(endpoint: dict[str, Any], *, mode: str) -> dict[str, Any]:
 # --------------------------------------------------------------------------- stages
 
 
+DEFAULT_LEARNING_UNITS = 12
+
+
+def learning_units(endpoint: dict[str, Any], *, dry_run: bool = False) -> int:
+    """Learning units run concurrently (scheduling only: not in the run identity).
+    The API teacher's client is not thread-safe: one unit at a time there. Bounded
+    by the endpoint's concurrency, so the 9B never sees more in-flight requests."""
+    teacher = endpoint.get("teacher") or {}
+    if teacher.get("mode") == "api":
+        return 1
+    raw = os.environ.get("XP_LEARNING_UNITS") or endpoint.get("learning_units")
+    units = int(raw) if raw else (4 if dry_run else DEFAULT_LEARNING_UNITS)
+    cap = int(endpoint.get("concurrency") or units)
+    return max(1, min(units, cap))
+
+
+def context_budgets(package: Path, plan: dict[str, Any],
+                    endpoint: dict[str, Any] | None) -> dict[str, dict[str, int]] | None:
+    """Per task, the parameters of the full-context fit (amendment-2 rule, when the
+    plan registers it), with the guard's exact accounting: ``max_model_len``, output
+    cap, margin, and the largest non-system part of a request over the task's test
+    questions (only their token counts are used; learning never sees a test case)."""
+    from slh.xp.partner import context
+
+    rule = (plan.get("learning") or {}).get("full_context")
+    if not rule:
+        return None
+    if rule.get("rule") != "fit-9b-context":
+        raise RegistrationMismatch(f"unknown full-context rule {rule!r}")
+    limit = context.max_model_len(endpoint)
+    return {task: context.fit_parameters(
+                pc.read_jsonl(package / plan["cases"][task]["test"]["file"]), limit=limit,
+                max_output=int(plan["limits"]["max_output_tokens"]),
+                margin=int(rule.get("margin", context.MARGIN)),
+                growth=int(rule.get("decision_growth",
+                                    plan["limits"]["max_output_tokens"])))
+            for task in plan["tasks"]}
+
+
 def learning_stage(package: Path, plan: dict[str, Any], out: Path, learner: Any,
-                   log: list[dict[str, Any]]) -> None:
+                   log: list[dict[str, Any]], *, budgets: dict[str, int] | None = None,
+                   units: int = 1) -> None:
+    """Every learning unit (task x run x writer) without a valid completion marker.
+    ``units`` > 1 runs independent units concurrently on a bounded pool (each on its
+    own learner copy: per-unit seed, state and outputs; one shared halt latch), so the
+    teacher and the 9B batch their requests. Results do not depend on the schedule."""
+    jobs = []
     for task in plan["tasks"]:
         splits = plan["cases"][task]
         pool = pc.read_jsonl(package / splits["train"]["file"])
@@ -333,13 +387,45 @@ def learning_stage(package: Path, plan: dict[str, Any], out: Path, learner: Any,
                 if d.exists():  # no valid marker: an interrupted unit is redone whole
                     log.append({"stage": "learning", "event": "redo_incomplete_unit",
                                 "task": task, "writer": writer, "run": run})
-                started = time.time()
-                learner.learn(task=task, writer=writer, run=run,
-                              critic=plan["critic"].get(writer, "none"), train=train, dev=dev,
-                              sentinel=sentinel, out=d, seed=int(plan["seed"]) * 1000 + run)
-                mark_complete(d)
-                log.append({"stage": "learning", "task": task, "writer": writer, "run": run,
-                            "wall_s": round(time.time() - started, 3)})
+                kwargs = {"task": task, "writer": writer, "run": run,
+                          "critic": plan["critic"].get(writer, "none"), "train": train,
+                          "dev": dev, "sentinel": sentinel, "out": d,
+                          "seed": int(plan["seed"]) * 1000 + run}
+                if budgets is not None:
+                    kwargs["context_budget"] = budgets[task]
+                jobs.append(kwargs)
+    lock = threading.Lock()
+    stop = threading.Event()
+
+    def do(kwargs: dict[str, Any]) -> None:
+        if stop.is_set():
+            return
+        unit = learner.unit_copy() if units > 1 and hasattr(learner, "unit_copy") \
+            else learner
+        started = time.time()
+        unit.learn(**kwargs)
+        mark_complete(kwargs["out"])
+        with lock:
+            log.append({"stage": "learning", "task": kwargs["task"],
+                        "writer": kwargs["writer"], "run": kwargs["run"],
+                        "wall_s": round(time.time() - started, 3)})
+
+    if units <= 1:
+        for kwargs in jobs:
+            do(kwargs)
+        return
+    errors: list[BaseException] = []
+    with ThreadPoolExecutor(max_workers=units) as pool_:
+        futures = [pool_.submit(do, kwargs) for kwargs in jobs]
+        for fut in futures:
+            try:
+                fut.result()
+            except BaseException as exc:  # noqa: BLE001 - re-raised below
+                stop.set()  # units not yet started do not start
+                errors.append(exc)
+    if errors:
+        halts = [e for e in errors if isinstance(e, RunHalted)]
+        raise (halts or errors)[0]
 
 
 _SUMMARY_HASH = {"skill.md": "skill_sha256", "generic.md": "generic_sha256",
@@ -380,6 +466,10 @@ def mark_complete(d: Path) -> None:
     problems = _unit_problems(d)
     if problems:
         raise RuntimeError(f"{d}: learning unit not complete: {problems}")
+    for p in sorted(Path(d).iterdir()):  # unit files are written without fsync
+        if p.is_file():
+            with p.open("rb") as handle:
+                os.fsync(handle.fileno())
     files = {p.name: pc.sha_file(p) for p in sorted(Path(d).iterdir())
              if p.is_file() and p.name != COMPLETE}
     body = json.dumps({"schema": "xp-learning-unit-complete-v1", "files": files},
@@ -554,7 +644,10 @@ def decision_stage(package: Path, plan: dict[str, Any], out: Path,
 
     started = time.time()
     written = 0
-    with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
+    # Group commit: fsync every few seconds, not per row (slow shared filesystems);
+    # a crash loses at most the unsynced rows, which resume simply redoes.
+    with pc.GroupAppender(path) as sink, \
+            ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
         queue = iter(pending)
         running = set()
 
@@ -568,7 +661,7 @@ def decision_stage(package: Path, plan: dict[str, Any], out: Path,
         while running:
             finished, running = wait(running, return_when=FIRST_COMPLETED)
             rows = [r for r in (f.result() for f in finished) if r is not None]
-            pc.append_jsonl(path, rows)
+            sink.write(rows)
             written += len(rows)
             if not halted.is_set():
                 fill()
@@ -638,8 +731,10 @@ def build_real(endpoint: dict[str, Any], plan: dict[str, Any]) -> tuple[Any, Any
     from slh.poc9.writers import TeacherChat, agent_chat, load_teacher
     from slh.xp.partner import learners
 
+    rule = (plan.get("learning") or {}).get("full_context") or {}
     decider = EndpointDecider(endpoint, seed=int(plan["seed"]),
-                              max_output_tokens=int(plan["limits"]["max_output_tokens"]))
+                              max_output_tokens=int(plan["limits"]["max_output_tokens"]),
+                              margin=rule.get("margin"), growth=rule.get("decision_growth"))
     teacher_cfg = endpoint.get("teacher") or {}
     needs_teacher = any(w.startswith("T") for w in plan["writers"]) or \
         "teacher" in plan["critic"].values()
@@ -667,7 +762,7 @@ def build_real(endpoint: dict[str, Any], plan: dict[str, Any]) -> tuple[Any, Any
     agent.max_dispatches = decider.client.model.retries + 1 + MAX_PAUSES
     if teacher is not None and not hasattr(teacher, "max_dispatches"):
         teacher.max_dispatches = teacher.model.retries + 1 + teacher.meter.max_pauses
-    if teacher is not None:
+    if teacher is not None and not getattr(teacher, "per_thread", False):
         teacher.backend = learners.guard_backend(teacher.backend)
     registered = (plan.get("learning") or {}).get("dispatch") or {}
     for role, chat in (("agent", agent), ("teacher", teacher)):
@@ -695,7 +790,7 @@ def build_dry(plan: dict[str, Any], decider: Any = None) -> tuple[Any, Any]:
 
 
 def preflight(package: Path, out: Path, *, endpoint: dict[str, Any], dry_run: bool = False,
-              smoke: bool = False, root: Path = pc.REPO) -> dict[str, Any]:
+              smoke: bool | str = False, root: Path = pc.REPO) -> dict[str, Any]:
     """Verification only, before any server starts: registration (plan, code, cases,
     protocol, benchmark copy), and that ``out`` (if started) has this run identity and
     no live runner. Raises RegistrationMismatch; writes nothing."""
@@ -704,7 +799,7 @@ def preflight(package: Path, out: Path, *, endpoint: dict[str, Any], dry_run: bo
     hashes = verify_registration(package, plan, root)
     hashes["run_identity"] = {"mode": "dry" if dry_run else "real",
                               "endpoint_sha256": endpoint_sha256(endpoint),
-                              "smoke": dict(pp.SMOKE) if smoke else None}
+                              "smoke": pp.smoke_setting(smoke)}
     path = out / "hashes.json"
     if path.is_file():
         old = pc.read_json(path)
@@ -731,7 +826,7 @@ def run_phase1(package: Path, out: Path, *, endpoint: dict[str, Any], dry_run: b
                decider: Decider | None = None, learner: Any = None,
                max_cases: int | None = None, export: bool = True,
                root: Path = pc.REPO, export_kwargs: dict[str, Any] | None = None,
-               smoke: bool = False) -> dict[str, Any]:
+               smoke: bool | str = False) -> dict[str, Any]:
     """``smoke``: the rehearsal setting (``plan.SMOKE``: the first run, the first
     test cases by id, a short lesson loop); recorded in the run identity, so a
     smoke run never mixes with a full one, and the registered plan is unchanged."""
@@ -741,7 +836,7 @@ def run_phase1(package: Path, out: Path, *, endpoint: dict[str, Any], dry_run: b
     plan = pp.load(package / "plan.json")
     hashes = verify_registration(package, plan, root)  # before any GPU work
     mode = "dry" if dry_run else "real"
-    smoke_spec = dict(pp.SMOKE) if smoke else None
+    smoke_spec = pp.smoke_setting(smoke)
     hashes["run_identity"] = {"mode": mode, "endpoint_sha256": endpoint_sha256(endpoint),
                               "smoke": smoke_spec}
     with run_lock(out):
@@ -764,8 +859,14 @@ def run_phase1(package: Path, out: Path, *, endpoint: dict[str, Any], dry_run: b
             learner.settings.ops = {**learner.settings.ops, **smoke_spec["ops"]}
         run_plan = pp.effective(plan, smoke_spec)
         log: list[dict[str, Any]] = []
+        budgets = context_budgets(package, run_plan, endpoint)
+        units = learning_units(endpoint, dry_run=dry_run)
+        log.append({"stage": "learning_settings", "units": units,
+                    **{f"context_budget_{t}": b["budget"] for t, b in (budgets or {}).items()},
+                    **{f"context_fixed_{t}": b["fixed_tokens"]
+                       for t, b in (budgets or {}).items()}})
         try:
-            learning_stage(package, run_plan, out, learner, log)
+            learning_stage(package, run_plan, out, learner, log, budgets=budgets, units=units)
             units = arm_stage(run_plan, out)
             concurrency = int(endpoint.get("concurrency") or plan["limits"].get("concurrency", 8))
             result = decision_stage(package, plan, out, units, decider,
@@ -798,7 +899,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--max-cases", type=int)
-    ap.add_argument("--smoke", action="store_true",
+    ap.add_argument("--smoke", nargs="?", const="smoke", default=None,
+                    choices=sorted(pp.SMOKES),
                     help="rehearsal setting: first run, first test cases, short lesson loop")
     ap.add_argument("--no-export", action="store_true")
     ap.add_argument("--preflight", action="store_true",

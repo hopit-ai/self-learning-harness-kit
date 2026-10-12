@@ -1,7 +1,7 @@
 # Runbook: plan xp-p1-2026-10-10 (phase 0, then phase 1)
 
-Repository `hopit-ai/self-learning-harness-kit`, tags `xp-p1-phase0-v1` (phase 0) and `xp-p1-v1`
-(phase 1). One 8xH100 node under Slurm. You send back small archives; no model weights,
+Repository `hopit-ai/self-learning-harness-kit`, tag `xp-p1-v1`: one command runs phase 0 (v2), the gate
+and phase 1. One 8xH100 node under Slurm. You send back small archives; no model weights,
 at most 100 MB per delivery.
 
 ## What runs
@@ -9,12 +9,13 @@ at most 100 MB per delivery.
 - **The 9B agent**: `Qwen/Qwen3.5-9B` at revision `c202236235762e1c871ad0ccb60c8ee5ba337b9a`,
   served by vLLM 0.30.0 with the pinned arguments in `slh/serve_spec.py`
   (only port, memory share, batch width and tensor/data parallel sizes are set by the job).
-- **The teacher** (writers T+, S+, T; teacher critic): a Qwen3.5-397B-A17B **FP8**
-  checkpoint served by the same vLLM on all 8 GPUs (tensor parallel 8), next to the 9B.
+- **The teacher** (writers T+, S+, T; advisory teacher critic): the model named by the
+  `TEACHER_*` settings (repository, revision, served name, layout; all recorded in the run
+  identity), served by the same vLLM on all 8 GPUs next to the 9B.
 - **The runner** (`python -m slh.xp.partner.runner`): learning runs, then every arm on
   every test question, then an export. Resumable; it refuses to start when the code,
   `package/` or the benchmark copy differ from `package/registration.json`
-  (code snapshot `5470c549fb7732b5eca7b45f1de198665f9427e7`, plan `8c56c6c008863a75...`).
+  (code snapshot `74c8b7c76b1fad4bcfead00c304f939faa37a592`, plan `c6ebe7bb08764a7b...`).
 
 Cases per task (train pool, validation, sentinel, test questions):
 
@@ -26,8 +27,8 @@ Cases per task (train pool, validation, sentinel, test questions):
 
 ## 0. What you need
 
-- Shared storage visible from login and compute nodes with about **600 GB free**
-  (teacher about 400 GB, 9B about 20 GB, caches, runs). Call it `WORK`.
+- Shared storage visible from login and compute nodes with room for the teacher's
+  weights plus about 100 GB (9B about 20 GB, caches, runs). Call it `WORK`.
 - On the login node: git, network to GitHub and PyPI, and a **Python 3.12** (any way you
   like, e.g. `micromamba create -p $WORK/py312 python=3.12`). Everything, the job helpers
   in `slurm/` included, runs with that Python (`$WORK/venv/bin/python`); nothing falls
@@ -43,7 +44,7 @@ Cases per task (train pool, validation, sentinel, test questions):
 ```bash
 export WORK=/your/large/shared/storage/xp          # not home, not /tmp
 export KIT=$WORK/kit TMPDIR=$WORK/tmp && mkdir -p $TMPDIR
-git clone --branch xp-p1-phase0-v1 --depth 1 https://github.com/hopit-ai/self-learning-harness-kit.git $KIT
+git clone --branch xp-p1-v1 --depth 1 https://github.com/hopit-ai/self-learning-harness-kit.git $KIT
 python3.12 -m venv $WORK/venv                        # or your 3.12's venv
 cd $KIT && PYTHON=$WORK/venv/bin/python scripts/xp/fetch_vendor.sh   # must print "ok": true
 $WORK/venv/bin/pip install -e $KIT/vendor/tau2-bench 'pyyaml>=6' 'jinja2>=3.1'   'pydantic>=2' 'huggingface_hub>=0.34'
@@ -65,8 +66,8 @@ and `export SERVE_MODE=venv VLLM_BIN=$WORK/vllm-env/bin/vllm`.
 sbatch [--account ...] $KIT/slurm/download.sbatch    # writes $WORK/models/download.json
 ```
 
-Set `TEACHER_REPO` / `TEACHER_REVISION` first if you already hold an FP8 checkpoint of
-Qwen3.5-397B-A17B; the receipt records the revision either way.
+The teacher is whatever `TEACHER_REPO` / `TEACHER_REVISION` name (defaults in
+`slurm/lib.sh`); the receipt records the revision either way.
 
 ## 3. Rehearse the job scripts without GPUs (optional, 2-5 minutes, login node)
 
@@ -74,35 +75,44 @@ Qwen3.5-397B-A17B; the receipt records the revision either way.
 bash $KIT/slurm/selftest.sh       # mock Slurm 25.05 + fake vLLM; must end "selftest ok"
 ```
 
-## 4. Phase 0: site check (one job, no training)
+## 4. One command: phase 0, the gate, phase 1
 
 ```bash
-sbatch [--account ...] $KIT/slurm/phase0.sbatch
+bash $KIT/slurm/run_all.sh [--account ...]     # run it again at any time: it resumes
 ```
 
-Rows, in order (`$WORK/phase0/job-<id>/phase0.json`): `facts` (GPUs, Slurm, disk, socket
-paths), `vendor` (benchmark copy), `dry-run` (fake model, real learning code; must print
-"export ok"), `serve` (teacher then 9B with health probes; startup seconds), `probe-agent`
-and `probe-teacher` (request rates), `smoke` (the real runner on your servers: smoke
-setting, 5 test cases per task). Expected **1.5-3 h** wall (limit 6 h), about **15-25
-GPU-hours**. Send back `$WORK/returns/xp-phase0-<id>.tar.gz` (small) whatever happened.
+1. **Phase 0** (one 8-GPU job, limit 8 h; expected **3.5-5 h**, about
+   **28-40 GPU-hours**; no training of model weights). Rows, in order
+   (`$WORK/phase0/job-<id>/phase0.json`): `facts`, `vendor`, `bootstrap`, `preflight`,
+   `dry-run` (fake model; phase 0 stops here if it fails, before any server), `serve`
+   (the teacher with CUDA graphs first, eager if graphs fail or take longer than
+   `TEACHER_GRAPHS_STARTUP_S`; then the 9B), `probe-agent`, `probe-teacher`, `measure`
+   (the plan's first two learning runs on the parallel pool, stopped at
+   `MEASURE_LEARN_S`), `slice` (one short learning run, then the first 20 test cases per
+   task through every arm, exported). Both servers' metrics are sampled throughout.
+2. **The gate** (a CPU-only job after phase 0): pre-registered conditions on phase 0's
+   evidence only (every row passed; servers started within bounds; no halt; every arm
+   produced rows in the slice; context-limit rows within a fixed share per arm; paired
+   error rates close; the measured phase-1 estimate within the GPU-hour cap; serving
+   settings within bounds; the slice export valid). It writes `$WORK/run_all/gate.json`.
+   **GO**: it submits phase 1 with settings derived from phase 0 by a registered rule
+   (concurrency, learning units, time limit, CUDA graphs or eager). **NO-GO**: it
+   archives the reasons (`$WORK/returns/xp-gate-<id>.tar.gz`) and stops; tell us.
+3. **Phase 1** (estimate **about 35-100 h (2-3 jobs of 48 h)**, **about 280-790 GPU-hours**, hard cap
+   `GPU_HOURS_CAP` (1600) over all phase-1 jobs; learning units run
+   12 at a time). Every phase-1 job first re-verifies the gate (GO, bound to
+   the phase-0 archive's hash, equal to a recomputation, the job's settings as derived),
+   then a preflight (registration, code, cases, benchmark, run identity); no server starts
+   before both pass. Each job lowers its own time limit to its GPU-hour budget, stops its
+   runner 20 minutes before it so it always archives; `run_all.sh` resubmits to resume.
+   Exit 3 = halted (cause in `halt.json`): fix and run `run_all.sh` again. Exit 4 =
+   refused: tell us.
 
-## 5. Phase 1 (after we confirm phase 0 and name the phase-1 tag)
-
-```bash
-git -C $KIT fetch --depth 1 origin tag xp-p1-v1 && git -C $KIT checkout xp-p1-v1
-bash $KIT/slurm/submit.sh [--account ...]            # resubmit the same line after any stop
-```
-
-Estimate **12-24 h** wall, **110-230 GPU-hours**, hard cap `GPU_HOURS_CAP` (240) over all
-phase-1 jobs. `submit.sh` asks Slurm for a time limit that fits what is left of the cap;
-the job checks again at start-up, trims its own limit, and stops its runner 20 minutes
-before the budget ends so it always archives; resubmitting resumes. Before any server
-starts, a verification-only preflight checks the registration, the code, the cases, the
-benchmark copy and the run identity (exit 4 on a mismatch, no GPU time spent on serving). Exit 3 = halted (cause in `halt.json`): fix and resubmit.
-Exit 4 = refused (code, package or benchmark differ from the registration): tell us.
-Send back `$WORK/returns/xp-phase1-export.tar.gz` (the delivery, at most 100 MB) and the
-last `xp-phase1-<id>-logs.tar.gz`. If the export does not fit, export one shard per task:
+`run_all.sh` never reruns a passed phase 0 (unless `--force-phase0`) and never starts
+phase 1 without a GO `gate.json` bound to that phase-0 archive. When it reports phase 1
+complete, send back: `$WORK/returns/xp-phase0-<id>.tar.gz`, `$WORK/run_all/gate.json`,
+`$WORK/returns/xp-phase1-export.tar.gz` (the delivery, at most 100 MB) and the last
+`xp-phase1-<id>-logs.tar.gz`. If the export does not fit, export one shard per task:
 `$WORK/venv/bin/python -m slh.xp.partner.export --run $WORK/runs/xp-phase1 --out shard-<task> --task <task>`.
 
 ## Settings (environment variables; defaults in `slurm/lib.sh`)
@@ -113,17 +123,35 @@ last `xp-phase1-<id>-logs.tar.gz`. If the export does not fit, export one shard 
 | `SERVE_LAUNCH` | `auto` | `srun` (overlapping steps), `direct` (child processes); `auto` = direct when the job script already runs inside a step |
 | `CONTAINER_IMAGE` | `vllm/vllm-openai:v0.30.0` | image or `.sqsh` path |
 | `PYXIS_FLAGS` | `--no-container-mount-home --container-mounts=$WORK:$WORK` | extra pyxis flags |
-| `TEACHER_TP`, `TEACHER_GPU_UTIL` | 8, 0.74 | teacher layout |
+| `TEACHER_REPO`, `TEACHER_REVISION`, `TEACHER_NAME` | see `slurm/lib.sh` | the teacher |
+| `TEACHER_TP`, `TEACHER_GPU_UTIL` | 8, 0.68 | teacher layout |
+| `TEACHER_EXPERT_PARALLEL` | 1 | split the teacher's MoE experts across the GPUs |
+| `TEACHER_EXTRA_ARGS` | `--language-model-only --engram-config={"cpu_offload":false}` | extra teacher flags, split on whitespace without a shell (write a JSON value as one token, no spaces) |
+| `TEACHER_EXTRA_ARGS_JSON` | unset | the same as a JSON array of strings, e.g. `'["--language-model-only","--enable-expert-parallel","--engram-config={\"cpu_offload\":false}"]'`; replaces `TEACHER_EXTRA_ARGS` when set. Both are recorded verbatim in the run identity; the gate accepts only the registered flags (`--language-model-only`, `--enable-expert-parallel`, `--engram-config={"cpu_offload":false}`) |
+| `TEACHER_MAX_BATCHED_TOKENS` | 0 | prefill chunk size (0 = vLLM's default) |
+| `LEARNING_UNITS` | 12 | learning units run concurrently (scheduling only) |
+| `XP_FSYNC_EVERY_S` | 2 | group commit of decision rows (seconds between fsyncs) |
+| `OUT` | `$WORK/runs/xp-phase1` | run folder; keep it on shared storage (see below) |
 | `AGENT_TP`, `AGENT_DP`, `AGENT_GPU_UTIL` | 4, 2, 0.16 | 9B layout (shares the GPUs) |
 | `TEACHER_STARTUP_TIMEOUT_S`, `AGENT_STARTUP_TIMEOUT_S` | 7200, 3600 | health-probe deadlines |
-| `TEACHER_EAGER` | 1 | no CUDA-graph capture for the teacher |
+| `TEACHER_EAGER` | 0 | CUDA graphs (startup ~390 s, ~150 tok/s per stream; eager ~5.8). Phase 0 falls back to eager when graphs fail or exceed `TEACHER_GRAPHS_STARTUP_S`; phase 1: derived by the gate from phase 0 |
+| `TEACHER_GRAPHS_STARTUP_S` | 2400 | phase 0: bound for the CUDA-graph teacher start |
+| `MEASURE_LEARN_S` | 5400 | phase 0: learning-throughput window |
 | `CONCURRENCY` | 32 | decisions in flight |
-| `GPU_HOURS_CAP`, `ARCHIVE_RESERVE_S` | 240, 1200 | phase-1 budget and archive margin |
+| `GPU_HOURS_CAP`, `ARCHIVE_RESERVE_S` | 1600, 1200 | phase-1 budget and archive margin |
 
 Keep every setting fixed across phase-1 resubmissions: serving arguments (TP, DP, memory
-share, lengths, eager mode, extra arguments), the image or vLLM install and `CONCURRENCY`
+share, lengths, eager mode, expert parallel, extra arguments), the image or vLLM install
+(and the launcher script's SHA-256), the serving environment variables and `CONCURRENCY`
 are all part of the run identity, and the preflight refuses a run directory started under
-other settings.
+other settings. `LEARNING_UNITS` may change (scheduling only).
+
+Both servers run with prefix caching and chunked prefill (writers resend long evidence;
+concurrent learning units batch). Decision rows are fsynced every `XP_FSYNC_EVERY_S`
+seconds (group commit), so a slow shared filesystem (one earlier site measured 1.3 s per
+fsync) does not throttle the run; after a crash, the few unsynced rows are simply redone.
+Keep `OUT` on shared storage: a run folder on node-local disk works, but a resubmitted job
+landing on another node cannot resume it.
 
 The runner starts through `scripts/xp/xp_boot.py`: no bytecode is written, cached bytecode
 is read only from a fresh empty directory, and it refuses compiled or path-hook files in
@@ -151,7 +179,7 @@ the registered code and importing it.
 You may change infrastructure that does not change what is generated or scored: time
 limits, Slurm directives, the settings above, cache and temp locations, the container or
 vLLM environment route, a crash in our scripts (fix minimally and tell us). Record each
-change: `git -C $KIT diff xp-p1-phase0-v1 > $WORK/local.diff` and send it with the archive.
+change: `git -C $KIT diff xp-p1-v1 > $WORK/local.diff` and send it with the archive.
 
 You must not change the models or their revisions, `package/` (plan, cases, protocol),
 anything under `slh/`, `configs/` or `scripts/xp/` (the runner refuses), sampling settings,
@@ -160,7 +188,6 @@ or any output file. A failed row with its logs is more useful to us than a row m
 ## Questions for you
 
 1. Pyxis with the pinned vLLM image, or a separate vLLM 0.30.0 environment?
-2. Can you get a Qwen3.5-397B-A17B FP8 checkpoint (which revision), and does it fit next to
-   the 9B on 8xH100 80 GB with the default layout (phase 0 measures it)?
+2. Is the default teacher (`slurm/lib.sh`) still the one you serve, and at which revision?
 3. Can one job run 48 h, and how many GPU-hours per day can you give phase 1?
 4. Does your dispatcher start job scripts inside an `srun` step?

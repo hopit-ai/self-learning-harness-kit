@@ -49,6 +49,24 @@ def job_state():
         return {}
 
 
+def save_job(st):
+    """The current job (job.json) and every job ever submitted (jobs.json, for sacct)."""
+    (STATE / "job.json").write_text(json.dumps(st))
+    try:
+        jobs = json.loads((STATE / "jobs.json").read_text())
+    except (OSError, ValueError):
+        jobs = {}
+    jobs[str(st["job"])] = st
+    (STATE / "jobs.json").write_text(json.dumps(jobs))
+
+
+def all_jobs():
+    try:
+        return list(json.loads((STATE / "jobs.json").read_text()).values())
+    except (OSError, ValueError):
+        return [job_state()] if job_state() else []
+
+
 def fmt_duration(s):
     s = max(0, int(s))
     d, rest = divmod(s, 86400)
@@ -101,9 +119,8 @@ def sbatch(argv):
     limit = parse_time(opts.get("--time") or opts.get("-t") or "01:00:00")
     name = opts.get("--job-name") or opts.get("-J") or Path(script).name
     start = int(time.time())
-    (STATE / "job.json").write_text(json.dumps({
-        "job": job, "name": name, "start": start, "limit": limit,
-        "gres": opts.get("--gres"), "state": "RUNNING"}))
+    save_job({"job": job, "name": name, "start": start, "limit": limit,
+              "gres": opts.get("--gres"), "state": "RUNNING"})
     out = (opts.get("--output") or "slurm-%j.out").replace("%j", str(job)).replace("%x", name)
     err = (opts.get("--error") or out).replace("%j", str(job)).replace("%x", name)
     env = {k: v for k, v in os.environ.items() if not k.startswith("SLURM_")}
@@ -123,9 +140,9 @@ def sbatch(argv):
     with open(out, "ab") as fo, open(err, "ab") if err != out else open(os.devnull) as fe:
         rc = subprocess.call(["bash", script, *rest], env=env, stdout=fo,
                              stderr=fe if err != out else subprocess.STDOUT)
-    st = job_state()
+    st = next((j for j in all_jobs() if j.get("job") == job), None) or job_state()
     st.update(state="COMPLETED" if rc == 0 else "FAILED", rc=rc, end=int(time.time()))
-    (STATE / "job.json").write_text(json.dumps(st))
+    save_job(st)
     return 0
 
 
@@ -196,7 +213,8 @@ def scontrol(argv):
    AllocTRES=cpu=192,mem=1800G,node=1,billing=192,gres/gpu=8
    OverSubscribe=NO Contiguous=0 Licenses=(null)""".format(
             job=st["job"], name=st["name"], state=st.get("state", "RUNNING"),
-            run=fmt_duration(time.time() - st["start"]), limit=fmt_duration(st["limit"]),
+            run=fmt_duration(time.time() - st["start"]),
+            limit=os.environ.get("SIM_TIMELIMIT") or fmt_duration(st["limit"]),
             start=start, end=end))
         return 0
     if argv[:1] == ["update"] and os.environ.get("SIM_SCONTROL_UPDATE") == "fail":
@@ -206,7 +224,7 @@ def scontrol(argv):
         kv = dict(a.split("=", 1) for a in argv[1:] if "=" in a)
         if kv.get("JobId") == str(st["job"]) and "TimeLimit" in kv:
             st["limit"] = parse_time(kv["TimeLimit"])
-            (STATE / "job.json").write_text(json.dumps(st))
+            save_job(st)
             return 0
         print("slurm_update error: Invalid job id specified", file=sys.stderr)
         return 1
@@ -218,10 +236,47 @@ def scontrol(argv):
     return 1
 
 
+def _opt(argv, *names):
+    for i, a in enumerate(argv):
+        for n in names:
+            if a == n and i + 1 < len(argv):
+                return argv[i + 1]
+            if a.startswith(n + "="):
+                return a.split("=", 1)[1]
+    return None
+
+
+def _failing(cmd):
+    """SIM_FAIL=squeue,sacct: the scheduler query fails (controller unreachable)."""
+    if cmd in (os.environ.get("SIM_FAIL") or "").split(","):
+        print("%s: error: Unable to contact slurm controller (connect failure)" % cmd,
+              file=sys.stderr)
+        return True
+    return False
+
+
+def _matches(argv, st):
+    job, name = _opt(argv, "-j", "--jobs"), _opt(argv, "--name")
+    return (job is None or job == str(st["job"])) and (name is None or name == st["name"])
+
+
 def squeue(argv):
     record("squeue", argv)
+    if _failing("squeue"):
+        return 1
     st = job_state()
     if not st:
+        return 0
+    if _opt(argv, "--name") is not None:
+        for j in all_jobs():
+            if j.get("state") in ("RUNNING", "PENDING") and _matches(argv, j):
+                print(j["job"])
+        return 0
+    if "-o" in argv and argv[argv.index("-o") + 1] == "%i":
+        # like squeue: finished jobs are not listed
+        if st.get("state") == "RUNNING" and ("-j" not in argv or
+                                            argv[argv.index("-j") + 1] == str(st["job"])):
+            print(st["job"])
         return 0
     if "-o" in argv and argv[argv.index("-o") + 1] == "%L":
         print(fmt_duration(st["start"] + st["limit"] - time.time()))
@@ -240,7 +295,17 @@ def squeue(argv):
 
 def sacct(argv):
     record("sacct", argv)
+    if _failing("sacct"):
+        return 1
     st = job_state()
+    fields = _opt(argv, "-o", "--format")
+    if fields:  # -n -X -P -o JobID,State,... (filtered by -j / --name)
+        for j in all_jobs():
+            if _matches(argv, j):
+                vals = {"jobid": str(j["job"]), "state": j.get("state", "RUNNING"),
+                        "jobname": j["name"]}
+                print("|".join(vals.get(f.strip().lower(), "") for f in fields.split(",")))
+        return 0
     if st:
         print("%d|%s|0:0|%s|Unknown|%s|%s|billing=192,cpu=192,gres/gpu=8,mem=1800G,node=1|"
               % (st["job"], st.get("state", "RUNNING"),

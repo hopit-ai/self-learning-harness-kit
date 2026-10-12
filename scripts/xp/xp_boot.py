@@ -17,7 +17,8 @@ Before ``slh`` is imported:
 4. Every registered code file (``registration.json`` ``source.paths``) has its
    registered git blob id, and the code hash equals ``code_sha256``.
 
-Then it runs ``slh.xp.partner.runner`` as ``__main__`` (or, with ``--serve-spec``,
+Then it runs ``slh.xp.partner.runner`` (or, with ``--module gate``, the phase gate)
+as ``__main__`` (or, with ``--serve-spec``,
 prints the pinned serving values from ``slh/serve_spec.py`` as JSON for the Slurm
 helpers, which never import ``slh`` themselves). Any failure prints a JSON
 refusal and exits 4 (as the runner does for a registration mismatch).
@@ -39,6 +40,7 @@ FORBIDDEN_SUFFIX = (".pyc", ".pyo", ".so", ".pyd", ".pth")
 FORBIDDEN_NAMES = frozenset({"sitecustomize.py", "usercustomize.py"})
 SKIP_TOP = frozenset({".git", ".venv", "runs"})
 MODEL_PLACEHOLDER = "<MODEL>"
+MODULES = frozenset({"runner", "gate"})
 
 
 def refuse(reason):
@@ -129,8 +131,15 @@ def main(argv):
                           "vllm_version": ss.VLLM_VERSION,
                           "vllm_args": ss.vllm_args(MODEL_PLACEHOLDER)}, indent=1))
         return
-    sys.argv = ["python -m slh.xp.partner.runner", *argv]
-    runpy.run_module("slh.xp.partner.runner", run_name="__main__", alter_sys=True)
+    module = "runner"
+    if "--module" in argv:  # registered entry points only
+        i = argv.index("--module")
+        module = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+        if module not in MODULES:
+            refuse(f"module {module!r} is not an entry point")
+    sys.argv = [f"python -m slh.xp.partner.{module}", *argv]
+    runpy.run_module(f"slh.xp.partner.{module}", run_name="__main__", alter_sys=True)
 
 
 if __name__ == "__main__":

@@ -264,6 +264,9 @@ def _ask(client: AgentClient, system: str, user: str
     from slh.serving import ServingWindowClosed
 
     backend, meter, _ = client.parts()
+    from slh.demo1.decide import _new_decision
+
+    _new_decision(backend)  # one writer call = one decision for a growth-tracking guard
     before = _tally(meter)
     try:
         reply = metered_complete(meter, "agent", backend,

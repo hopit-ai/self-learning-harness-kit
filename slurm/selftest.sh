@@ -6,7 +6,7 @@
 #
 #   bash $KIT/slurm/selftest.sh [--phase1] [--in-step] [--keep]
 #
-#   --phase1   also run phase1.sbatch (smoke setting, 3 test cases per task)
+#   --phase1   then the gate and phase 1 through run_all.sh (the one-command flow)
 #   --in-step  pretend the job script already runs inside an srun step (the
 #              dispatcher case): the servers must start as child processes
 # Needs: HARNESS_PY (default $WORK/venv/bin/python) with the kit installed, and the
@@ -30,6 +30,10 @@ export KIT HARNESS_PY WORK="$BASE/work" SIM_SLURM_STATE="$BASE/slurm-state"
 export PATH="$KIT/slurm/sim/bin:$PATH" SERVE_MODE=venv VLLM_BIN="$KIT/slurm/sim/bin/vllm"
 export MODELS="$WORK/models" XP_STOP_GRACE_S=1 XP_TMPDIR="$BASE/t"
 export TEACHER_STARTUP_TIMEOUT_S="${TEACHER_STARTUP_TIMEOUT_S:-120}" AGENT_STARTUP_TIMEOUT_S="${AGENT_STARTUP_TIMEOUT_S:-120}"
+# Short measurement windows for the mock (the real ones are minutes to hours).
+export TEACHER_GRAPHS_STARTUP_S=60 MEASURE_LEARN_S="${SELFTEST_MEASURE_S:-120}" MEASURE_MIN_S=5
+export SLICE_RESERVE_S=60
+export METRICS_INTERVAL_S=1 MIN_USEFUL_S=60
 mkdir -p "$MODELS/agent" "$MODELS/teacher" "$WORK"
 [[ $IN_STEP == 1 ]] && export SIM_SBATCH_ENV="SLURM_STEP_ID=0" SIM_SRUN_BUSY=fail
 cd "$BASE"
@@ -42,7 +46,8 @@ STATUS="$WORK/phase0/job-$JOB/phase0.json"
 "$HARNESS_PY" - "$STATUS" "$PHASE1" <<'PY'
 import json, sys
 rows = json.load(open(sys.argv[1]))["rows"]
-need = ["facts", "vendor", "dry-run", "serve", "probe-agent", "probe-teacher", "smoke"]
+need = ["facts", "vendor", "bootstrap", "preflight", "dry-run", "serve", "probe-agent",
+        "probe-teacher", "measure", "slice"]
 got = {r["row"]: r["status"] for r in rows}
 bad = [n for n in need if got.get(n) != "pass"] + [r["row"] for r in rows if r["status"] != "pass"]
 for r in rows:
@@ -54,12 +59,14 @@ ARCHIVE="$WORK/returns/xp-phase0-$JOB.tar.gz"
 echo "[selftest] phase-0 archive: $(wc -c < "$ARCHIVE") bytes" >&2
 
 if [[ $PHASE1 == 1 ]]; then
-  echo "[selftest] phase 1 under mock Slurm (smoke, 3 cases per task)" >&2
-  RUNNER_ARGS="--smoke --max-cases 3" sbatch --parsable "$KIT/slurm/phase1.sbatch" > "$BASE/job1" || true
-  JOB1="$(cat "$BASE/job1")"
-  grep -q '"runner_exit": "0"' "$WORK/phase1/job-$JOB1/phase1.json" \
-    || { echo "phase 1 did not finish; see $BASE/xp-phase1-$JOB1.out" >&2; exit 1; }
-  [[ -s "$WORK/returns/xp-phase1-export.tar.gz" ]] || { echo "no phase-1 export archive" >&2; exit 1; }
+  echo "[selftest] the gate and phase 1 through run_all.sh (phase 0 above is reused)" >&2
+  # phase 1 in the smoke setting (first run, 3 cases per task): the flow, not the work
+  RUNNER_ARGS="${RUNNER_ARGS:---smoke --max-cases 3}" bash "$KIT/slurm/run_all.sh" >&2 \
+    || { echo "run_all.sh failed" >&2; exit 1; }
+  grep -q '"decision": "GO"' "$WORK/run_all/gate.json" || { echo "gate not GO" >&2; exit 1; }
+  # the smoke setting is never "complete": its export is kept as *.incomplete.tar.gz
+  compgen -G "$WORK/returns/xp-phase1-export*.tar.gz" > /dev/null \
+    || { echo "no phase-1 export archive" >&2; exit 1; }
 fi
 OK=1
 echo "selftest ok"

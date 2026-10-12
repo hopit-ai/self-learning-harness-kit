@@ -36,6 +36,16 @@
    "n": 2,
    "name": "best_of_n",
    "scope": "shared"
+  },
+  {
+   "kind": "notes",
+   "name": "human",
+   "scope": "shared",
+   "texts": {
+    "address": "WHEN the user asks to ship an order to an address they describe by reference (another order, a product they bought, a past delivery, a city, a payment used) and does not give the full address, THEN look up their orders and take the shipping address from the one order that matches the description; use it exactly as recorded. WHEN no order matches, or more than one order matches with different addresses, THEN do not guess: tell the user what you found and ask which address they mean.",
+    "sequence": "WHEN the user wants to change both the shipping address and the items of the same pending order, THEN change the address first: modifying items can be done only once and locks the order, so the address cannot be changed after it. Confirm each change separately with its exact details and get the user's yes before each tool call. WHEN the user asks for the items first, THEN explain this and still change the address first.",
+    "variant": "WHEN the user wants to exchange or modify an item and describes the replacement by its options or limits (for example colour, size or a price cap) instead of giving an item id, THEN look up the product's variants and keep only available variants of the same product that meet every option and limit the user stated. WHEN exactly one variant fits, THEN use that item id, and before the tool call state that exact item and get the user's yes, unless they already approved that exact item. WHEN none or several fit, THEN do not guess: tell the user what you found and ask which one they want."
+   }
   }
  ],
  "cases": {
@@ -176,9 +186,15 @@
     "output_tokens": 798720
    }
   },
+  "critic_mode": "advisory",
   "dispatch": {
    "agent": 17,
    "teacher": 13
+  },
+  "full_context": {
+   "decision_growth": 16384,
+   "margin": 1024,
+   "rule": "fit-9b-context"
   },
   "train_samples": {
    "address": {
@@ -2035,7 +2051,7 @@
  "runs": 12,
  "schema": "xp-partner-plan-v1",
  "seed": 7401,
- "sha256": "8c56c6c008863a75c6adc5dc8f06261c09899ab93331c3e173adf8e8476e538c",
+ "sha256": "c6ebe7bb08764a7bbd828900d9814af5ca10ebc67ee1983579dd9bf197c9c5c0",
  "tasks": [
   "address",
   "variant",
