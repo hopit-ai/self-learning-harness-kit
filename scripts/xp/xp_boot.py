@@ -139,6 +139,7 @@ def main(argv):
         if module not in MODULES:
             refuse(f"module {module!r} is not an entry point")
     sys.argv = [f"python -m slh.xp.partner.{module}", *argv]
+    os.environ["XP_BOOT"] = "1"  # the module's own entry does not bootstrap again
     runpy.run_module(f"slh.xp.partner.{module}", run_name="__main__", alter_sys=True)
 
 

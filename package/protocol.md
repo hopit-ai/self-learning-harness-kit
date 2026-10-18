@@ -1,4 +1,4 @@
-# Protocol xp-p1-2026-10-10
+# Protocol xp-h1a-2026-10-18
 
 Frozen copy of docs/xp/plan-v1.md.
 

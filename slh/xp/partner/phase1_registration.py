@@ -21,6 +21,7 @@ recomputation.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import re
@@ -269,20 +270,348 @@ def append_amendment(registry_dir: Path = REPO / "learner_runs", public: Path = 
     return check_amendment(registry_dir, public, root)
 
 
+# --------------------------------------------------------------------------- amendment 2
+
+AMEND2_ID = f"{PLAN_ID}-phase1-amendment-2"
+AMEND2_DOC = "docs/xp/registration-phase1-amendment-2.md"
+AMEND2_COMMIT = "a68f8991c75aae48ce0445c6e98b593b152103a6"
+AMEND2_PLAN_SHA256 = "c6ebe7bb08764a7bbd828900d9814af5ca10ebc67ee1983579dd9bf197c9c5c0"
+AMEND2_SNAPSHOT = "74c8b7c76b1fad4bcfead00c304f939faa37a592"
+PHASE1_TAG = "xp-p1-v1"
+PUBLIC_V1 = Path.home() / ".slh-xp/public" / PHASE1_TAG
+GATE_CODE = ("slh/xp/partner/gate.py", "slh/xp/partner/estimate.py",
+             "slh/xp/partner/context.py", "scripts/xp/slurm/run_all.sh",
+             "scripts/xp/slurm/submit_phase1.sh", "scripts/xp/slurm/lib.sh")
+GATE_CONSTANTS = ("RULE", "GPU_HOURS_CAP", "STARTUP_BOUND_S", "CONTEXT_LIMIT_SHARE",
+                  "PAIRED_MODE", "PAIRED_MAX_CASE_DIFF", "PAIRED_ERROR_DIFF",
+                  "ESTIMATE_MARGIN", "TIME_LIMIT_CLASSES", "MAX_MODEL_LEN",
+                  "CONCURRENCY_BOUNDS", "UNITS_BOUNDS", "TIME_LIMIT_BOUNDS_H",
+                  "UTIL_SUM_MAX", "TEACHER_EXTRA_ALLOWED")
+TEACHER_DEFAULTS = ("TEACHER_REPO", "TEACHER_REVISION", "TEACHER_NAME", "TEACHER_TP",
+                    "TEACHER_GPU_UTIL", "TEACHER_EXPERT_PARALLEL", "TEACHER_MAX_LEN",
+                    "TEACHER_EAGER", "TEACHER_EXTRA_ARGS", "AGENT_TP", "AGENT_DP",
+                    "AGENT_GPU_UTIL", "LEARNING_UNITS")
+AMEND2_APPROVALS = [
+    "2026-10-11: teacher switch XD1 (docs/xp/deviations.md)",
+    "2026-10-12: advisory critic for every writer",
+    "2026-10-12: keep writer T with all 12 runs",
+    "2026-10-12: GPU-hour cap 1,600 with the 0.8 x cap admission rule",
+    "2026-10-12: full-context whole-episode fit rule with decision-growth reserve",
+    "2026-10-12: per-case context-limit handling",
+    "2026-10-12: parallel learning",
+    "2026-10-12: serving defaults (CUDA graphs with eager fallback, expert parallel, "
+    "engram cpu_offload off, language-model-only, teacher memory share 0.68)",
+    "2026-10-12: one-command flow with its gate conditions, relaxed slice paired check "
+    "(more than 5 error cases -> NO-GO; strict 2-point rule stays in the final analysis), "
+    "the derivation rule xp-gate-v1 and gate-bound serving settings",
+]
+AMEND2_NOTE = ("No phase-1 result exists; phase-0 runs are site checks whose smoke scores "
+               "nobody has read. Analysis code is not hash-identical to amendment 1 "
+               "(labels, package path, refactor and added checks in check.py; stats.py "
+               "unchanged; scoring of test decisions unchanged); the hashes here bind "
+               "phase 1.")
+
+
+def _literals(source: bytes, names: tuple[str, ...]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for node in ast.parse(source).body:
+        target = node.targets[0] if isinstance(node, ast.Assign) else \
+            node.target if isinstance(node, ast.AnnAssign) else None
+        if isinstance(target, ast.Name) and target.id in names and node.value is not None:
+            value = node.value
+            if isinstance(value, ast.Call) and getattr(value.func, "id", "") == "frozenset":
+                out[target.id] = sorted(ast.literal_eval(value.args[0]))
+            else:
+                v = ast.literal_eval(value)
+                out[target.id] = list(v) if isinstance(v, tuple) else v
+    missing = set(names) - set(out)
+    if missing:
+        raise ValueError(f"constants not found: {sorted(missing)}")
+    return out
+
+
+def gate_conditions(source: bytes) -> list[str]:
+    """The condition names in the order ``_evaluate`` appends them (both spellings of a
+    mode-dependent name)."""
+    fn = next(n for n in ast.parse(source).body
+              if isinstance(n, ast.FunctionDef) and n.name == "_evaluate")
+    names = []
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_cond":
+            arg = node.args[0]
+            parts = [arg.body, arg.orelse] if isinstance(arg, ast.IfExp) else [arg]
+            names.append(" | ".join(ast.literal_eval(a) for a in parts))
+    return sorted(set(names), key=lambda n: source.decode().index(n.split(" | ")[0]))
+
+
+DERIVATION_FUNCTIONS = ("derive", "adjust", "time_limit")
+DERIVATION_RULE = ("TEACHER_EAGER 0 if the CUDA-graph teacher started within its bound, else 1; "
+                   "CONCURRENCY = phase 0's, halved if more than 1% of slice rows hit a "
+                   "time-limit class, clamped to CONCURRENCY_BOUNDS; LEARNING_UNITS 12, or 8 "
+                   "if the measure run recorded case-level errors, clamped to UNITS_BOUNDS; "
+                   "time limit = ceil(rescaled conservative wall / jobs) + 1 h, clamped to "
+                   "TIME_LIMIT_BOUNDS_H; GPU_HOURS_CAP registered")
+
+
+def derivation_sources(source: bytes) -> dict[str, str]:
+    """SHA-256 of each derivation function's exact source text in gate.py."""
+    text = source.decode("utf-8")
+    out = {}
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.FunctionDef) and node.name in DERIVATION_FUNCTIONS:
+            out[node.name] = pc.sha_text(ast.get_source_segment(text, node))
+    if set(out) != set(DERIVATION_FUNCTIONS):
+        raise ValueError("derivation functions not found")
+    return out
+
+
+def shell_defaults(source: bytes, names: tuple[str, ...]) -> dict[str, str]:
+    text = source.decode("utf-8")
+    out = {}
+    for n in names:
+        m = re.search(rf'^{n}="\$\{{{n}:-(.*?)\}}"', text, re.M) or \
+            re.search(rf"^\s*{n}='(.*?)'", text, re.M)
+        if not m:
+            raise ValueError(f"default for {n} not found")
+        out[n] = m.group(1)
+    return out
+
+
+def public_hashes(public: Path) -> dict[str, Any]:
+    pkg = public / "package"
+    plan = json.loads((pkg / "plan.json").read_text(encoding="utf-8"))
+    body = {k: v for k, v in plan.items() if k != "sha256"}
+    if pc.sha_text(pc.canonical(body)) != plan.get("sha256"):
+        raise ValueError("plan.json does not hash to its own sha256")
+    reg = json.loads((pkg / "registration.json").read_text(encoding="utf-8"))
+    cases = {f"cases/{p.name}": _sha(p) for p in sorted((pkg / "cases").glob("*.jsonl"))}
+    out = {"manifest_sha256": _sha(public / "MANIFEST.json"),
+           "plan_sha256": plan["sha256"], "plan_file_sha256": _sha(pkg / "plan.json"),
+           "registration_file_sha256": _sha(pkg / "registration.json"),
+           "protocol_sha256": _sha(pkg / "protocol.md"), "case_files": cases,
+           "test_membership": membership(public),
+           "snapshot_commit": reg["git_commit"], "source_commit": reg["source"]["commit"],
+           "code_sha256": reg["code_sha256"]}
+    if reg["plan_sha256"] != plan["sha256"] or reg["protocol_sha256"] != \
+            out["protocol_sha256"] or plan["protocol"]["sha256"] != out["protocol_sha256"] \
+            or reg["case_files"] != cases or reg["test_membership"] != out["test_membership"]:
+        raise ValueError("public tree disagrees with its own registration.json")
+    return out, plan
+
+
+def _plan_changes(old: dict[str, Any], new: dict[str, Any], path: str = "") -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if isinstance(old, dict) and isinstance(new, dict):
+        for k in sorted(set(old) | set(new)):
+            if k == "sha256" and not path:
+                continue
+            if old.get(k) != new.get(k):
+                out.update(_plan_changes(old.get(k), new.get(k), f"{path}.{k}".lstrip(".")))
+        return out
+    return {path: new}
+
+
+def build_amendment2(public: Path = PUBLIC_V1, root: Path = REPO,
+                     rows: list[dict[str, Any]] | None = None,
+                     commit: str = AMEND2_COMMIT) -> dict[str, Any]:
+    rows = Registry(root / "learner_runs").rows() if rows is None else rows
+    a1 = [r for r in rows if r.get("event") == AMEND_EVENT and r.get("amendment_id") == AMEND_ID]
+    if len(a1) != 1:
+        raise ValueError("amendment 2 needs exactly one amendment-1 row")
+    a1 = a1[0]
+    pub, plan = public_hashes(public)
+    if pub["plan_sha256"] != AMEND2_PLAN_SHA256 or pub["snapshot_commit"] != AMEND2_SNAPSHOT \
+            or pub["source_commit"] != commit:
+        raise ValueError("public tree is not the amendment-2 build")
+    for key in ("protocol_sha256", "case_files", "test_membership"):
+        if pub[key] != a1[key]:
+            raise ValueError(f"{key} differs from amendment 1")
+    old = amended_plan(PUBLIC, root, a1["code_commit"])
+    changes = _plan_changes(old, plan)
+    paths = analysis_paths(root, commit)
+    analysis = {p: hashlib.sha256(_show(root, commit, p)).hexdigest() for p in paths}
+    changed = sorted(p for p in set(analysis) | set(a1["analysis_code_sha256"])
+                     if analysis.get(p) != a1["analysis_code_sha256"].get(p))
+    stats_src = _show(root, commit, "slh/xp/analysis/stats.py")
+    report_src = _show(root, commit, "slh/xp/analysis/report.py")
+    gate_src = _show(root, commit, "slh/xp/partner/gate.py")
+    return {
+        "event": AMEND_EVENT, "amendment_id": AMEND2_ID, "amends": REGISTRATION_ID,
+        "follows": AMEND_ID, "plan_id": PLAN_ID,
+        "doc_path": AMEND2_DOC, "doc_sha256": _sha(root / AMEND2_DOC),
+        "source_docs_sha256": {d: hashlib.sha256(_show(root, commit, d)).hexdigest()
+                               for d in ("docs/xp/amendment-2.md", "docs/xp/deviations.md",
+                                         "docs/xp/conventions.md")},
+        "code_commit": commit, "phase1_tag": PHASE1_TAG, "public": pub,
+        "previous_plan_sha256": a1["plan_sha256"], "plan_changes": changes,
+        "analysis_code_sha256": analysis, "analysis_changed_since_amendment_1": changed,
+        "bootstrap_seed": int(_constant(stats_src, "SEED")),
+        "bootstrap_draws": int(_constant(stats_src, "DRAWS")),
+        "error_rate_margin_points": _constant(report_src, "ERROR_RATE_MARGIN"),
+        "gate_code_sha256": {p: hashlib.sha256(_show(root, commit, p)).hexdigest()
+                             for p in GATE_CODE},
+        "gate_constants": _literals(gate_src, GATE_CONSTANTS),
+        "gate_conditions": gate_conditions(gate_src),
+        "derivation_rule": DERIVATION_RULE,
+        "derivation_source_sha256": derivation_sources(gate_src),
+        "serving_defaults": shell_defaults(_show(root, commit, "scripts/xp/slurm/lib.sh"),
+                                           TEACHER_DEFAULTS),
+        "owner_approvals": AMEND2_APPROVALS, "note": AMEND2_NOTE,
+    }
+
+
+def _find(rows: list[dict[str, Any]], amendment_id: str) -> list[dict[str, Any]]:
+    return [r for r in rows if r.get("event") == AMEND_EVENT
+            and r.get("amendment_id") == amendment_id]
+
+
+def check_amendment2(registry_dir: Path = REPO / "learner_runs", public: Path = PUBLIC_V1,
+                     root: Path = REPO) -> dict[str, Any]:
+    rows = Registry(registry_dir).rows()
+    found = _find(rows, AMEND2_ID)
+    if len(found) != 1:
+        raise ValueError(f"expected one {AMEND2_ID} row, found {len(found)}")
+    row = found[0]
+    a1 = _find(rows, AMEND_ID)
+    if len(a1) != 1 or rows.index(a1[0]) > rows.index(row):
+        raise ValueError("amendment 2 must follow exactly one amendment-1 row")
+    fresh = build_amendment2(public, root, rows, row["code_commit"])
+    stored = {k: v for k, v in row.items() if k != "prev_sha256"}
+    if stored != fresh:
+        diff = sorted(k for k in set(stored) | set(fresh) if stored.get(k) != fresh.get(k))
+        raise ValueError(f"registered amendment 2 differs from a recomputation: {diff}")
+    index = rows.index(row)
+    line = (registry_dir / "REGISTRY.jsonl").read_bytes().splitlines(keepends=True)[index]
+    return {"ok": True, "rows": len(rows), "line": index + 1,
+            "row_sha256": hashlib.sha256(line).hexdigest(),
+            "prev_sha256": row["prev_sha256"]}
+
+
+def append_amendment2(registry_dir: Path = REPO / "learner_runs", public: Path = PUBLIC_V1,
+                      root: Path = REPO) -> dict[str, Any]:
+    registry = Registry(registry_dir)
+    rows = registry.rows()
+    if _find(rows, AMEND2_ID):
+        raise FileExistsError(f"{AMEND2_ID} already registered; append refused")
+    registry.append(build_amendment2(public, root, rows))
+    return check_amendment2(registry_dir, public, root)
+
+
+# --------------------------------------------------------------------------- amendment 3
+
+AMEND3_ID = f"{PLAN_ID}-phase1-amendment-3"
+AMEND3_DOC = "docs/xp/registration-phase1-amendment-3.md"
+AMEND3_APPROVAL = "owner approved amendment 3 on 2026-10-13, before any phase-1 result was read"
+AMEND3_RULE = ("For each confirmatory contrast, when the wrong-write interval is degenerate "
+               "(zero width) or rests on fewer than EXACT_MIN_DISCORDANT discordant pairs, "
+               "non-inferiority is judged on 100 x the one-sided 97.5% Clopper-Pearson upper "
+               "bound of (endpoint-only wrong-write pairs / scored pairs), pooled over tasks "
+               "and runs; it holds only if that bound is below the 2-point margin. Otherwise "
+               "the registered crossed bootstrap-t interval is used unchanged.")
+AMEND3_STATUS = ("No phase-1 result has been received or read. The published tag xp-p1-v1 "
+                 "is unchanged (its analysis copy has the amendment-2 hashes); the analysis "
+                 "runs on our side only.")
+
+
+def build_amendment3(public: Path = PUBLIC_V1, root: Path = REPO,
+                     rows: list[dict[str, Any]] | None = None,
+                     commit: str | None = None) -> dict[str, Any]:
+    rows = Registry(root / "learner_runs").rows() if rows is None else rows
+    a2 = _find(rows, AMEND2_ID)
+    if len(a2) != 1:
+        raise ValueError("amendment 3 needs exactly one amendment-2 row")
+    a2 = a2[0]
+    commit = commit or _git(root, "rev-parse", "HEAD").strip()
+    pub, _ = public_hashes(public)
+    if pub != a2["public"]:
+        raise ValueError("the public tree differs from the one amendment 2 registered")
+    shipped = {p: _sha(public / p) for p in a2["analysis_code_sha256"]
+               if p.startswith("slh/xp/analysis/")}
+    if any(shipped[p] != a2["analysis_code_sha256"][p] for p in shipped):
+        raise ValueError("the published tag's analysis copy changed")
+    paths = analysis_paths(root, commit)
+    analysis = {p: hashlib.sha256(_show(root, commit, p)).hexdigest() for p in paths}
+    changed = sorted(p for p in set(analysis) | set(a2["analysis_code_sha256"])
+                     if analysis.get(p) != a2["analysis_code_sha256"].get(p))
+    stats_src = _show(root, commit, "slh/xp/analysis/stats.py")
+    report_src = _show(root, commit, "slh/xp/analysis/report.py")
+    test = "tests/test_xp_analysis_exact.py"
+    return {
+        "event": AMEND_EVENT, "amendment_id": AMEND3_ID, "amends": REGISTRATION_ID,
+        "follows": AMEND2_ID, "plan_id": PLAN_ID,
+        "doc_path": AMEND3_DOC, "doc_sha256": _sha(root / AMEND3_DOC),
+        "code_commit": commit, "analysis_code_sha256": analysis,
+        "analysis_changed_since_amendment_2": changed,
+        "test_sha256": {test: hashlib.sha256(_show(root, commit, test)).hexdigest()},
+        "rule": AMEND3_RULE,
+        "exact_min_discordant": int(_constant(stats_src, "EXACT_MIN_DISCORDANT")),
+        "exact_alpha_one_sided": _constant(stats_src, "ALPHA") / 2,
+        "wrong_write_margin_points": 2.0,
+        "bootstrap_seed": int(_constant(stats_src, "SEED")),
+        "bootstrap_draws": int(_constant(stats_src, "DRAWS")),
+        "error_rate_margin_points": _constant(report_src, "ERROR_RATE_MARGIN"),
+        "plan_sha256": pub["plan_sha256"], "plan_file_sha256": pub["plan_file_sha256"],
+        "protocol_sha256": pub["protocol_sha256"], "case_files": pub["case_files"],
+        "test_membership": pub["test_membership"], "phase1_tag": PHASE1_TAG,
+        "owner_approval": AMEND3_APPROVAL, "status": AMEND3_STATUS,
+    }
+
+
+def check_amendment3(registry_dir: Path = REPO / "learner_runs", public: Path = PUBLIC_V1,
+                     root: Path = REPO) -> dict[str, Any]:
+    rows = Registry(registry_dir).rows()
+    found = _find(rows, AMEND3_ID)
+    if len(found) != 1:
+        raise ValueError(f"expected one {AMEND3_ID} row, found {len(found)}")
+    row = found[0]
+    a2 = _find(rows, AMEND2_ID)
+    if len(a2) != 1 or rows.index(a2[0]) > rows.index(row):
+        raise ValueError("amendment 3 must follow exactly one amendment-2 row")
+    fresh = build_amendment3(public, root, rows, row["code_commit"])
+    stored = {k: v for k, v in row.items() if k != "prev_sha256"}
+    if stored != fresh:
+        diff = sorted(k for k in set(stored) | set(fresh) if stored.get(k) != fresh.get(k))
+        raise ValueError(f"registered amendment 3 differs from a recomputation: {diff}")
+    index = rows.index(row)
+    line = (registry_dir / "REGISTRY.jsonl").read_bytes().splitlines(keepends=True)[index]
+    return {"ok": True, "rows": len(rows), "line": index + 1,
+            "row_sha256": hashlib.sha256(line).hexdigest(),
+            "prev_sha256": row["prev_sha256"]}
+
+
+def append_amendment3(registry_dir: Path = REPO / "learner_runs", public: Path = PUBLIC_V1,
+                      root: Path = REPO) -> dict[str, Any]:
+    registry = Registry(registry_dir)
+    rows = registry.rows()
+    if _find(rows, AMEND3_ID):
+        raise FileExistsError(f"{AMEND3_ID} already registered; append refused")
+    registry.append(build_amendment3(public, root, rows))
+    return check_amendment3(registry_dir, public, root)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--public", type=Path, default=PUBLIC)
     ap.add_argument("--registry-dir", type=Path, default=REPO / "learner_runs")
     ap.add_argument("--append", action="store_true")
     ap.add_argument("--append-amendment-1", action="store_true")
+    ap.add_argument("--append-amendment-2", action="store_true")
+    ap.add_argument("--append-amendment-3", action="store_true")
+    ap.add_argument("--public-v1", type=Path, default=PUBLIC_V1)
     args = ap.parse_args(argv)
-    if args.append_amendment_1:
+    if args.append_amendment_3:
+        out = {"amendment_3": append_amendment3(args.registry_dir, args.public_v1)}
+    elif args.append_amendment_2:
+        out = {"amendment_2": append_amendment2(args.registry_dir, args.public_v1)}
+    elif args.append_amendment_1:
         out = {"amendment_1": append_amendment(args.registry_dir, args.public)}
     elif args.append:
         out = {"registration": append(args.registry_dir, args.public)}
     else:
         out = {"registration": check(args.registry_dir, args.public),
-               "amendment_1": check_amendment(args.registry_dir, args.public)}
+               "amendment_1": check_amendment(args.registry_dir, args.public),
+               "amendment_2": check_amendment2(args.registry_dir, args.public_v1),
+               "amendment_3": check_amendment3(args.registry_dir, args.public_v1)}
     print(json.dumps(out, indent=1, sort_keys=True))
     return 0
 

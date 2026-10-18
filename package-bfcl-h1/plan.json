@@ -1,0 +1,874 @@
+{
+ "cells": [
+  {
+   "arm": "B1",
+   "cell_id": "h1-feas-b1-t0",
+   "purpose": "feasibility",
+   "trial": 0,
+   "units": [
+    {
+     "instance": "multi_turn_base_3",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_3",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_5",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_5",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_9",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_9",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_11",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_11",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_15",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_15",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_20",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_20",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_23",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_23",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_33",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_33",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_37",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_37",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_44",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_44",
+     "notes_sha256": null
+    }
+   ]
+  },
+  {
+   "arm": "B1",
+   "cell_id": "h1-disc-b1-t0",
+   "purpose": "discovery",
+   "trial": 0,
+   "units": [
+    {
+     "instance": "multi_turn_base_46",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_46",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_47",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_47",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_50",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_50",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_53",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_53",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_61",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_61",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_62",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_62",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_63",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_63",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_67",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_67",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_73",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_73",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_76",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_76",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_77",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_77",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_83",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_83",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_98",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_98",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_105",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_105",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_107",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_107",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_111",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_111",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_115",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_115",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_116",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_116",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_122",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_122",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_129",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_129",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_136",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_136",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_137",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_137",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_138",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_138",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_140",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_140",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_142",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_142",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_144",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_144",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_147",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_147",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_163",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_163",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_166",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_166",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_169",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_169",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_170",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_170",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_175",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_175",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_177",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_177",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_180",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_180",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_182",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_182",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_187",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_187",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_191",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_191",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_196",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_196",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_197",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_197",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_198",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_198",
+     "notes_sha256": null
+    }
+   ]
+  },
+  {
+   "arm": "B1",
+   "cell_id": "h1-disc-b1-t1",
+   "purpose": "discovery",
+   "trial": 1,
+   "units": [
+    {
+     "instance": "multi_turn_base_3",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_3",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_5",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_5",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_9",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_9",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_11",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_11",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_15",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_15",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_20",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_20",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_23",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_23",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_33",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_33",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_37",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_37",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_44",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_44",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_46",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_46",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_47",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_47",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_50",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_50",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_53",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_53",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_61",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_61",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_62",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_62",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_63",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_63",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_67",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_67",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_73",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_73",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_76",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_76",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_77",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_77",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_83",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_83",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_98",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_98",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_105",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_105",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_107",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_107",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_111",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_111",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_115",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_115",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_116",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_116",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_122",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_122",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_129",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_129",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_136",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_136",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_137",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_137",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_138",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_138",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_140",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_140",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_142",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_142",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_144",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_144",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_147",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_147",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_163",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_163",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_166",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_166",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_169",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_169",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_170",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_170",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_175",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_175",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_177",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_177",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_180",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_180",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_182",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_182",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_187",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_187",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_191",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_191",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_196",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_196",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_197",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_197",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_base_198",
+     "notes_sha256": null
+    },
+    {
+     "instance": "multi_turn_long_context_198",
+     "notes_sha256": null
+    }
+   ]
+  }
+ ],
+ "code": {
+  "slh/__init__.py": "7b17b433cf3605f222231ae32f4a2a6eb5c1ebd2c9cc75ab4c57c79f3787af9f",
+  "slh/xp/__init__.py": "cedc48b3667cc5a080dbc9d3fe987767c2fc961fc2a7c08eb508b0e369a38b9e",
+  "slh/xp/bfcl/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "slh/xp/bfcl/data.py": "bf0f369e6c3e74c575872ee613160829234eab1b44678a2de664400cd1a4756c",
+  "slh/xp/bfcl/handler.py": "7ffdb0002857333eb39ce2b38f36735eea7b6eb1bda87c0c67445b311952dc53",
+  "slh/xp/bfcl/plan.py": "15d53c0ef074902813afce16d834e23a5f84ccf15370afbab3f376566f691f96",
+  "slh/xp/bfcl/runner.py": "f61c67148513a189e5a7d02bfea534b50fbb35045cce9944077b65696fe748b3",
+  "slh/xp/bfcl/splits.py": "4c0eda9f34e0d91330792a5a9843adacd9bc4a2e21cb9b2d1d29585d65761f30",
+  "slh/xp/bfcl/traces.py": "61727fce6b9d046822d2aca0b9573d61a81d28e26278c69561c46c6cb1dbf42c",
+  "slh/xp/bfcl/vendor.py": "53e254f4e82941eb7f1017243a2966f0e9986c554ca130de385d9d1c340b8d82",
+  "slh/xp/partner/common.py": "79144e44c183f70f5a1b38f159b67185e359a040909f28f12397f55a9b406056"
+ },
+ "decoding": {
+  "name": "sampled",
+  "sampling": {
+   "top_p": 0.8
+  },
+  "temperature": 0.7
+ },
+ "handoff": "h1",
+ "note": "cell h1-feas-b1-t0 first; it is also discovery trial 0 of its 20 instances",
+ "notes": {},
+ "order": [
+  "h1-feas-b1-t0",
+  "h1-disc-b1-t0",
+  "h1-disc-b1-t1"
+ ],
+ "schema": "xp-bfcl-plan-v1",
+ "served_model": "qwen3.5-9b-vllm",
+ "sha256": "324e981f2764aec8c13c75ecd69f0f93143949fb41117b98f36d5930dd667fb3",
+ "splits_sha256": "5fee084c7c405891870c6be0ac3feda4674c8fa65e13b7ee16b2bbb22e48b74c",
+ "vendor": {
+  "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+  "license": "Apache-2.0",
+  "pypi": {
+   "name": "bfcl-eval",
+   "sdist_sha256": "4a3869673721fa59be93d8f55ca92d69ab5797058aed792149c6adafda064bc1",
+   "version": "2026.3.23",
+   "wheel": "bfcl_eval-2026.3.23-py3-none-any.whl",
+   "wheel_sha256": "3bb6dfa5f0c68ad403c9ec50b00db2bb3b4cc9b38ab1ff33f48fe30d853d3a0a"
+  },
+  "subdir": "berkeley-function-call-leaderboard",
+  "subtree": "112d6789512dabeb9969b4fb4c97348d1047198a",
+  "upstream": "https://github.com/ShishirPatil/gorilla"
+ }
+}

@@ -134,39 +134,14 @@ def evaluate(record: dict[str, Any], package: Path) -> dict[str, Any]:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def _evaluate(record: dict[str, Any], run: Path, package: Path) -> dict[str, Any]:
-    from slh import serve_spec
-    from slh.xp.partner import estimate as est
+def slice_conditions(slice_dir: Path, plan: dict[str, Any], package: Path
+                     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """The registered conditions on a slice-setting run folder (the runner's layout):
+    every arm instance with exactly its slice cases, context-limit shares, paired arms.
+    Returns the conditions and the decision rows."""
     from slh.xp.partner import plan as pp
 
-    plan = pp.load(package / "plan.json")
     conds: list[dict[str, Any]] = []
-    truncated = sorted(str(p.relative_to(run.parent)) for p in run.parent.rglob(
-        "TRUNCATED.txt"))
-    conds.append(_cond("phase-0 archive complete", not truncated, truncated, "no truncation"))
-    status = _json(run / "phase0.json") or {}
-    rows = status.get("rows") or []
-    failed = [r["row"] for r in rows if r.get("status") != "pass"]
-    want_rows = {"facts", "vendor", "bootstrap", "preflight", "dry-run", "serve",
-                 "probe-agent", "measure", "slice"}
-    if plan.get("writers") and any(w.startswith("T") for w in plan["writers"]):
-        want_rows.add("probe-teacher")
-    missing = sorted(want_rows - {r["row"] for r in rows})
-    conds.append(_cond("every phase-0 row passed", not failed and not missing,
-                       {"failed": failed, "missing": missing}, "all pass"))
-    starts = {}
-    for name in ("teacher", "agent"):
-        s = _json(run / "serve" / f"{name}.startup.json") or {}
-        starts[name] = {"status": s.get("status"), "seconds": s.get("seconds")}
-    teacher_needed = any(w.startswith("T") for w in plan["writers"])
-    ok = all((starts[n]["status"] == "ready" and (starts[n]["seconds"] or 0)
-              <= STARTUP_BOUND_S[n]) for n in (("teacher", "agent") if teacher_needed
-                                               else ("agent",)))
-    conds.append(_cond("both servers started within bounds", ok, starts, STARTUP_BOUND_S))
-    halts = [h for h in ("measure/halt.json", "slice/halt.json") if (run / h).is_file()]
-    conds.append(_cond("no halt", not halts, halts, "none"))
-    # the slice: every arm, valid rows, context limits, paired error rates
-    slice_dir = run / "slice"
     decisions = pc.read_jsonl(slice_dir / "decisions.jsonl")
     arms = pc.read_jsonl(slice_dir / "arms.jsonl")
     cases = int(pp.SMOKES["slice"]["cases"])
@@ -247,23 +222,14 @@ def _evaluate(record: dict[str, Any], run: Path, package: Path) -> dict[str, Any
     conds.append(_cond("paired arms: no catastrophic error-rate difference" if
                        PAIRED_MODE == "cases" else
                        "paired-arm error-rate difference within bound", ok, pairs, bound))
-    # the estimate, with the DERIVED settings (slower settings scale the measured
-    # throughput down; faster ones are not credited), within ESTIMATE_MARGIN x the cap
-    measure = _json(run / "measure.json") or {}
-    startup = sum((starts[n]["seconds"] or 0) for n in starts)
-    estimate = est.measured_estimate(plan, run / "measure", float(measure.get("wall_s") or 0),
-                                     slice_dir, startup_s=startup) \
-        if measure.get("wall_s") else {"estimate": "no measurement"}
-    ep = _json(run / "endpoint.yaml") or {}
-    derived = derive(run, decisions, ep)
-    adjusted = adjust(estimate, derived, measured_units=int(measure.get("units") or 12),
-                      measured_concurrency=int(ep.get("concurrency") or 32), startup_s=startup)
-    derived["TIME_LIMIT_H"] = time_limit(adjusted)
-    gpu_hi = (adjusted.get("gpu_h") or [None, None])[1]
-    conds.append(_cond("measured phase-1 estimate (derived settings) within the cap margin",
-                       gpu_hi is not None and gpu_hi <= ESTIMATE_MARGIN * GPU_HOURS_CAP,
-                       gpu_hi, ESTIMATE_MARGIN * GPU_HOURS_CAP))
-    # serving settings
+    return conds, decisions
+
+
+def serving_condition(ep: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    """Serving settings within the registered bounds (an endpoint file)."""
+    from slh import serve_spec
+
+    teacher_needed = any(w.startswith("T") for w in plan["writers"])
     from slh.xp.partner import context
 
     args = ep.get("serving_args") or []
@@ -291,11 +257,99 @@ def _evaluate(record: dict[str, Any], run: Path, package: Path) -> dict[str, Any
           and CONCURRENCY_BOUNDS[0] <= int(ep.get("concurrency") or 0) <= CONCURRENCY_BOUNDS[1]
           and ep.get("model_revision") == serve_spec.MODEL_REVISION
           and ep.get("vllm_version") == serve_spec.VLLM_VERSION and extras_ok)
-    conds.append(_cond("serving settings within registered bounds", ok, serving, {
+    return _cond("serving settings within registered bounds", ok, serving, {
         "max_model_len": MAX_MODEL_LEN, "agent_tp_x_dp": "<= 8",
         "memory_share": f"<= {UTIL_SUM_MAX}", "concurrency": CONCURRENCY_BOUNDS,
         "model_revision": serve_spec.MODEL_REVISION, "vllm_version": serve_spec.VLLM_VERSION,
-        "teacher_extra_args": f"each one of {list(TEACHER_EXTRA_ALLOWED)}"}))
+        "teacher_extra_args": f"each one of {list(TEACHER_EXTRA_ALLOWED)}"})
+
+
+def check_smoke(out: Path, package: Path) -> dict[str, Any]:
+    """The plain kit's optional check (no Slurm, no job chaining, nothing bound): the
+    registered slice conditions on the partner's own smoke run in the slice setting
+    (``runner --smoke slice``): the run is that setting, no halt, every arm instance
+    with exactly its slice cases, context-limit shares, paired arms, serving settings
+    within the registered bounds (as the run recorded them), the export valid.
+    Phase-0-only conditions (job rows, server start-up bounds, the GPU-hour estimate)
+    do not apply. GO or NO-GO, printed for the partner and for us."""
+    from slh.xp.partner import plan as pp
+
+    out = Path(out)
+    plan = pp.load(package / "plan.json")
+    conds: list[dict[str, Any]] = []
+    ident = (_json(out / "hashes.json") or {}).get("run_identity") or {}
+    conds.append(_cond("a real run in the slice setting", ident.get("mode") == "real"
+                       and ident.get("smoke") == pp.SMOKES["slice"],
+                       {"mode": ident.get("mode"), "smoke": ident.get("smoke")},
+                       {"mode": "real", "smoke": pp.SMOKES["slice"]}))
+    conds.append(_cond("no halt", not (out / "halt.json").is_file(),
+                       (_json(out / "halt.json") or {}).get("reason"), "none"))
+    if (out / "arms.jsonl").is_file() and (out / "decisions.jsonl").is_file():
+        found, _ = slice_conditions(out, plan, package)
+        conds += found
+    else:
+        conds.append(_cond("every arm instance produced exactly its slice cases", False,
+                           "no arms.jsonl or decisions.jsonl", "present"))
+    ep = (_json(out / "env.json") or {}).get("endpoint") or {}
+    conds.append(serving_condition(ep, plan))
+    valid, why = _export_valid(out / "export", package, plan)
+    conds.append(_cond("slice export valid against the schema", valid, why, "valid"))
+    decision = "GO" if all(c["ok"] for c in conds) else "NO-GO"
+    return {"schema": "xp-smoke-check-v1", "rule": RULE, "plan_id": plan["plan_id"],
+            "decision": decision, "reasons": [c["name"] for c in conds if not c["ok"]],
+            "conditions": conds}
+
+
+def _evaluate(record: dict[str, Any], run: Path, package: Path) -> dict[str, Any]:
+    from slh.xp.partner import estimate as est
+    from slh.xp.partner import plan as pp
+
+    plan = pp.load(package / "plan.json")
+    conds: list[dict[str, Any]] = []
+    truncated = sorted(str(p.relative_to(run.parent)) for p in run.parent.rglob(
+        "TRUNCATED.txt"))
+    conds.append(_cond("phase-0 archive complete", not truncated, truncated, "no truncation"))
+    status = _json(run / "phase0.json") or {}
+    rows = status.get("rows") or []
+    failed = [r["row"] for r in rows if r.get("status") != "pass"]
+    want_rows = {"facts", "vendor", "bootstrap", "preflight", "dry-run", "serve",
+                 "probe-agent", "measure", "slice"}
+    if plan.get("writers") and any(w.startswith("T") for w in plan["writers"]):
+        want_rows.add("probe-teacher")
+    missing = sorted(want_rows - {r["row"] for r in rows})
+    conds.append(_cond("every phase-0 row passed", not failed and not missing,
+                       {"failed": failed, "missing": missing}, "all pass"))
+    starts = {}
+    for name in ("teacher", "agent"):
+        s = _json(run / "serve" / f"{name}.startup.json") or {}
+        starts[name] = {"status": s.get("status"), "seconds": s.get("seconds")}
+    teacher_needed = any(w.startswith("T") for w in plan["writers"])
+    ok = all((starts[n]["status"] == "ready" and (starts[n]["seconds"] or 0)
+              <= STARTUP_BOUND_S[n]) for n in (("teacher", "agent") if teacher_needed
+                                               else ("agent",)))
+    conds.append(_cond("both servers started within bounds", ok, starts, STARTUP_BOUND_S))
+    halts = [h for h in ("measure/halt.json", "slice/halt.json") if (run / h).is_file()]
+    conds.append(_cond("no halt", not halts, halts, "none"))
+    slice_dir = run / "slice"
+    found, decisions = slice_conditions(slice_dir, plan, package)
+    conds += found
+    # the estimate, with the DERIVED settings (slower settings scale the measured
+    # throughput down; faster ones are not credited), within ESTIMATE_MARGIN x the cap
+    measure = _json(run / "measure.json") or {}
+    startup = sum((starts[n]["seconds"] or 0) for n in starts)
+    estimate = est.measured_estimate(plan, run / "measure", float(measure.get("wall_s") or 0),
+                                     slice_dir, startup_s=startup) \
+        if measure.get("wall_s") else {"estimate": "no measurement"}
+    ep = _json(run / "endpoint.yaml") or {}
+    derived = derive(run, decisions, ep)
+    adjusted = adjust(estimate, derived, measured_units=int(measure.get("units") or 12),
+                      measured_concurrency=int(ep.get("concurrency") or 32), startup_s=startup)
+    derived["TIME_LIMIT_H"] = time_limit(adjusted)
+    gpu_hi = (adjusted.get("gpu_h") or [None, None])[1]
+    conds.append(_cond("measured phase-1 estimate (derived settings) within the cap margin",
+                       gpu_hi is not None and gpu_hi <= ESTIMATE_MARGIN * GPU_HOURS_CAP,
+                       gpu_hi, ESTIMATE_MARGIN * GPU_HOURS_CAP))
+    conds.append(serving_condition(ep, plan))
     valid, why = _export_valid(slice_dir / "export", package, plan)
     conds.append(_cond("slice export valid against the schema", valid, why, "valid"))
     decision = "GO" if all(c["ok"] for c in conds) else "NO-GO"
@@ -655,6 +709,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="where the validated archive is moved before the marker")
     p.add_argument("--package", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
+    p = sub.add_parser("check-smoke", help="plain kit: the registered slice conditions "
+                       "on a smoke run (runner --smoke slice); prints GO or NO-GO")
+    p.add_argument("--run", type=Path, required=True)
+    p.add_argument("--package", type=Path, required=True)
+    p.add_argument("--out", type=Path, help="also write the result as JSON")
     p = sub.add_parser("serving")
     p.add_argument("--gate", type=Path, required=True)
     p.add_argument("--endpoint", type=Path, required=True)
@@ -669,6 +728,13 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     if args.cmd == "complete":
         return _complete(args.archive, args.dest, args.package, args.out)
+    if args.cmd == "check-smoke":
+        result = check_smoke(args.run, args.package)
+        if args.out:
+            pc.write_json(args.out, result)
+        print(json.dumps({"decision": result["decision"], "reasons": result["reasons"]},
+                         indent=1))
+        return 0 if result["decision"] == "GO" else 2
     if args.cmd == "serving":
         gate, ep = _json(args.gate), _json(args.endpoint)
         if not gate or not ep:
@@ -706,4 +772,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(pc.entry("gate", main))

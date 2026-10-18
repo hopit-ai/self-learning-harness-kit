@@ -72,6 +72,55 @@ def code_hashes(root: Path = REPO) -> dict[str, Any]:
     return {"files": files, "code_sha256": sha_text(canonical(files))}
 
 
+def kit_paths(root: Path = REPO) -> frozenset[str] | None:
+    """The paths the partner kit ships from ``root`` (``snapshot.allowlist``), or None
+    inside a kit (the snapshot builder is never shipped: every file present ships).
+
+    Hand-off package builders register only shipped code, so a package built from our
+    repository and one built from the kit tree register the same files, and the
+    partner's code check never asks for an our-side module the kit leaves out."""
+    try:
+        from slh.xp.partner import snapshot
+    except ImportError:
+        return None
+    if not (Path(root) / "slh/xp/partner/snapshot.py").is_file():
+        return None
+    return frozenset(snapshot.allowlist(Path(root)))
+
+
+# vLLM server flags that would put sampling defaults under the requests' own parameters:
+# ``--generation-config`` other than ``vllm`` (vLLM's default ``auto`` applies the model
+# repository's generation_config.json to every parameter a request leaves out) and any
+# ``--override-generation-config``. Every hand-off sends its decoding per request (part A:
+# the phase-1 decision config, temperature 0; parts B and C: temperature 0.7, top-p 0.8);
+# the server must add nothing to it.
+SAMPLING_FLAGS = ("--generation-config", "--override-generation-config")
+
+
+def serving_sampling_problems(serving_args: Any) -> list[str]:
+    """Problems with the recorded ``vllm serve`` argv (``endpoint.serving_args``): it
+    must be a list naming ``--generation-config vllm`` and no
+    ``--override-generation-config``, so the server never supplies sampling defaults."""
+    if not isinstance(serving_args, list) or not all(isinstance(a, str) for a in serving_args):
+        return ["endpoint serving_args must be the exact vllm serve argv (a list of strings)"]
+    out, gen = [], []
+    for k, arg in enumerate(serving_args):
+        flag, _, inline = arg.partition("=")
+        if flag not in SAMPLING_FLAGS:
+            continue
+        value = inline if inline else (serving_args[k + 1] if k + 1 < len(serving_args)
+                                       else "")
+        if flag == "--override-generation-config":
+            out.append(f"serving_args sets --override-generation-config {value!r}: remove it "
+                       "(sampling is sent per request)")
+        else:
+            gen.append(value)
+    if gen != ["vllm"]:
+        out.append("serving_args must contain --generation-config vllm exactly once (no "
+                   f"sampling defaults from the model repository); found {gen or 'none'}")
+    return out
+
+
 def git_blob_id(path: Path) -> str:
     """The git blob id of a file's bytes (``git hash-object``), computed without git."""
     data = Path(path).read_bytes()
@@ -345,3 +394,23 @@ def gold_atoms(case: dict[str, Any]) -> dict[str, Any] | None:
         args.get("zip") else None
     return {"call": canonical({"name": gold.get("name"), "arguments": args}),
             "order_id": args["order_id"], "values": values, "address": address}
+
+
+def entry(module: str, main: Any) -> int:
+    """``python -m slh.xp.partner.<module>``: run through the trusted bootstrap
+    (scripts/xp/xp_boot.py: no bytecode written, a fresh empty bytecode cache, no
+    import artifacts, every registered code file checked) unless already inside it.
+    The process re-executes itself; arguments are passed unchanged."""
+    import sys
+    import tempfile
+
+    boot = REPO / "scripts" / "xp" / "xp_boot.py"
+    if os.environ.get("XP_BOOT") == "1" or not boot.is_file():
+        return int(main() or 0)
+    env = {**os.environ, "XP_BOOT": "1", "PYTHONDONTWRITEBYTECODE": "1",
+           "PYTHONPYCACHEPREFIX": tempfile.mkdtemp(prefix="xp-pyc.")}
+    extra = [] if module == "runner" else ["--module", module]
+    os.chdir(REPO)
+    os.execve(sys.executable, [sys.executable, str(boot), *extra, *sys.argv[1:]], env)
+    return 4  # not reached
+

@@ -1,21 +1,35 @@
-# Self-learning harness: partner kit
+# Self-learning harness: partner kit (plain)
 
-Public packages for running our self-learning harness experiments on a partner's GPUs.
-Each package is one tag; check out the tag, never `main`, so we know exactly what ran.
+**Hand-off 1a (current): start with [docs/xp/handoff1a-runbook.md](docs/xp/handoff1a-runbook.md)**;
+it refers to README-plain.md for the environment and the agent server.
 
-| Tag | What |
-|---|---|
-| `xp-p1-v1` | plan `xp-p1-2026-10-10`: one command for phase 0 (v2), the gate and phase 1 |
-| `xp-p1-phase0-v1` | plan `xp-p1-2026-10-10`: phase 0 v1, the first site check (done) |
+Plan `xp-h1a-2026-10-18`: the code that runs (`slh/`, `configs/`, `scripts/xp/`,
+`pyproject.toml`), the frozen package (`package/`: plan, registration, protocol, test
+questions) and `MANIFEST.json` (SHA-256 of every file). No job scripts: you start the
+servers and run one Python command. Start with [README-plain.md](README-plain.md).
 
-Start with [README-phase1.md](README-phase1.md).
+## Release `xp-h1a-v1`
 
-What is here: the code that runs (`slh/`, `configs/`, `scripts/xp/`, `pyproject.toml`),
-the frozen package (`package/`: plan, registration, protocol, cases), the Slurm job scripts
-(`slurm/`) and `MANIFEST.json` (SHA-256 of every file). The test cases ship as questions
-only: their answers stay with us and the results are scored on our side. The runner
-refuses to start if the code, the package or the benchmark copy differ from
-`package/registration.json`.
+This commit is tag `xp-h1a-v1` of `hopit-ai/self-learning-harness-kit` (a new tag; earlier tags are never
+moved). The hand-off packages are part of this tree (hashed in `MANIFEST.json`, their code
+registration checked against this tree when the release was built); this release runs only part B (function-calling benchmark: oracle check, feasibility barrier, discovery), part C (household text games: offline dependency build and feasibility check):
 
-Licence: MIT (LICENSE). The benchmark (tau2-bench, MIT) is fetched at a pinned commit,
-not included; see NOTICE.
+| Directory | What | plan.json sha256 |
+|---|---|---|
+| `package-bfcl-h1/` | part B: function-calling benchmark, feasibility then discovery | `324e981f2764aec8...` |
+
+Offline assets attached to the release (put them next to this directory; checksums also in
+`MANIFEST.json` under `release.assets`):
+
+| Asset | sha256 | bytes |
+|---|---|---:|
+| `alfworld-offline-linux-x86_64-py312.tar.gz` | `777b1a8ee590ea07ea6ebe1d47f08b96442490b078f20163a5737e261f5578cd` | 150697555 |
+| `alfworld-offline.sha256` | `c8c3207b8b1b79036842e8ac3dca6e4d5288789514af85eb25a4f8ccee5c45f7` | 109 |
+| `offline-assets.json` | `7cea783c97db18bc98f4693d7c125decbf1d1da84f0233c16bf0e6901e168514` | 500 |
+| `tau2-bench-672227c6b6676edc20d57ea53b7000262aae77b9.tar.gz` | `a65736d75b1f5cc712c3e068704c64ca7fd4592d0e7cc94248ef45f1c05afd76` | 165984479 |
+| `wheelhouse-bfcl-linux-x86_64-py312.tar.gz` | `5cd8aed9d3c2a9e7d543bbc18f8b6051c7e6edffb8b2a92f3ba5950be8a8f34c` | 106569207 |
+| `wheelhouse-bfcl.sha256` | `c78e63ccaef9e63566376dfbe8cc3cf1357c77e5e5f4ebd891bcc0e308aaa32d` | 108 |
+| `wheelhouse-linux-x86_64-py312.tar.gz` | `d67df2fa5518996ff5a5f74db92f27bfa1b800b73e744421882ced5b5405021e` | 67497161 |
+
+Licence: MIT (LICENSE). The benchmark (tau2-bench, MIT) is used at a pinned commit, not
+included; see NOTICE.

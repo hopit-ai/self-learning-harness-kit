@@ -1,0 +1,4056 @@
+{
+ "audit": {
+  "clusters": {
+   "links": {
+    "ground_truth": [
+     [
+      51,
+      64
+     ],
+     [
+      56,
+      59
+     ],
+     [
+      64,
+      68
+     ],
+     [
+      64,
+      82
+     ],
+     [
+      64,
+      86
+     ],
+     [
+      64,
+      87
+     ],
+     [
+      64,
+      93
+     ],
+     [
+      68,
+      82
+     ],
+     [
+      68,
+      86
+     ],
+     [
+      68,
+      93
+     ],
+     [
+      68,
+      99
+     ],
+     [
+      70,
+      84
+     ],
+     [
+      70,
+      86
+     ],
+     [
+      80,
+      85
+     ],
+     [
+      82,
+      86
+     ],
+     [
+      82,
+      93
+     ],
+     [
+      82,
+      99
+     ],
+     [
+      84,
+      86
+     ],
+     [
+      86,
+      87
+     ],
+     [
+      86,
+      93
+     ],
+     [
+      89,
+      97
+     ],
+     [
+      90,
+      96
+     ],
+     [
+      92,
+      93
+     ],
+     [
+      104,
+      113
+     ],
+     [
+      104,
+      114
+     ],
+     [
+      107,
+      136
+     ],
+     [
+      118,
+      120
+     ],
+     [
+      118,
+      124
+     ],
+     [
+      120,
+      124
+     ],
+     [
+      120,
+      148
+     ],
+     [
+      124,
+      148
+     ],
+     [
+      128,
+      131
+     ]
+    ],
+    "initial_config": [
+     [
+      63,
+      83
+     ],
+     [
+      66,
+      70,
+      74
+     ],
+     [
+      100,
+      104,
+      133
+     ]
+    ],
+    "question": [
+     [
+      40,
+      43
+     ]
+    ]
+   },
+   "mixed_domain_clusters": [
+    [
+     51,
+     64,
+     66,
+     68,
+     70,
+     74,
+     82,
+     84,
+     86,
+     87,
+     92,
+     93,
+     99
+    ],
+    [
+     56,
+     59
+    ],
+    [
+     63,
+     83
+    ],
+    [
+     80,
+     85
+    ],
+    [
+     89,
+     97
+    ],
+    [
+     90,
+     96
+    ],
+    [
+     100,
+     104,
+     113,
+     114,
+     133
+    ],
+    [
+     107,
+     136
+    ],
+    [
+     118,
+     120,
+     124,
+     148
+    ],
+    [
+     128,
+     131
+    ]
+   ],
+   "multi_root_clusters": [
+    [
+     40,
+     43
+    ],
+    [
+     51,
+     64,
+     66,
+     68,
+     70,
+     74,
+     82,
+     84,
+     86,
+     87,
+     92,
+     93,
+     99
+    ],
+    [
+     56,
+     59
+    ],
+    [
+     63,
+     83
+    ],
+    [
+     80,
+     85
+    ],
+    [
+     89,
+     97
+    ],
+    [
+     90,
+     96
+    ],
+    [
+     100,
+     104,
+     113,
+     114,
+     133
+    ],
+    [
+     107,
+     136
+    ],
+    [
+     118,
+     120,
+     124,
+     148
+    ],
+    [
+     128,
+     131
+    ]
+   ],
+   "thresholds": {
+    "ground_truth_jaccard": 0.6,
+    "question_jaccard": 0.4
+   }
+  },
+  "counts": {
+   "discovery": 50,
+   "gate": 30,
+   "test": 120
+  },
+  "deviations": [],
+  "families": {
+   "discovery": {
+    "files": 15,
+    "finance": 12,
+    "travel": 13,
+    "vehicle": 10
+   },
+   "gate": {
+    "files": 9,
+    "finance": 7,
+    "travel": 8,
+    "vehicle": 6
+   },
+   "test": {
+    "files": 39,
+    "finance": 26,
+    "travel": 27,
+    "vehicle": 28
+   }
+  },
+  "quotas": {
+   "GorillaFileSystem": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 8
+   },
+   "GorillaFileSystem+MathAPI": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 7
+   },
+   "GorillaFileSystem+MessageAPI": {
+    "discovery": 2,
+    "gate": 1,
+    "test": 5
+   },
+   "GorillaFileSystem+TicketAPI": {
+    "discovery": 1,
+    "gate": 1,
+    "test": 3
+   },
+   "GorillaFileSystem+TwitterAPI": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 7
+   },
+   "MathAPI+TradingBot": {
+    "discovery": 1,
+    "gate": 0,
+    "test": 2
+   },
+   "MathAPI+TravelAPI": {
+    "discovery": 0,
+    "gate": 0,
+    "test": 2
+   },
+   "MathAPI+VehicleControlAPI": {
+    "discovery": 1,
+    "gate": 1,
+    "test": 3
+   },
+   "MessageAPI+TradingBot": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 5
+   },
+   "MessageAPI+TravelAPI": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 5
+   },
+   "MessageAPI+VehicleControlAPI": {
+    "discovery": 5,
+    "gate": 3,
+    "test": 13
+   },
+   "TicketAPI+TradingBot": {
+    "discovery": 2,
+    "gate": 1,
+    "test": 4
+   },
+   "TicketAPI+TravelAPI": {
+    "discovery": 4,
+    "gate": 2,
+    "test": 9
+   },
+   "TicketAPI+VehicleControlAPI": {
+    "discovery": 0,
+    "gate": 0,
+    "test": 2
+   },
+   "TradingBot": {
+    "discovery": 7,
+    "gate": 4,
+    "test": 16
+   },
+   "TradingBot+TwitterAPI": {
+    "discovery": 1,
+    "gate": 0,
+    "test": 2
+   },
+   "TravelAPI": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 8
+   },
+   "TravelAPI+TwitterAPI": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 5
+   },
+   "TwitterAPI+VehicleControlAPI": {
+    "discovery": 3,
+    "gate": 2,
+    "test": 8
+   },
+   "VehicleControlAPI": {
+    "discovery": 2,
+    "gate": 1,
+    "test": 6
+   }
+  },
+  "siblings": {
+   "long_context": {
+    "min_own_jaccard": 0.878,
+    "misaligned": [],
+    "same_initial_config": 194
+   },
+   "miss_func": {
+    "min_own_jaccard": 0.925,
+    "misaligned": [],
+    "same_initial_config": 193
+   },
+   "miss_param": {
+    "min_own_jaccard": 0.667,
+    "misaligned": [],
+    "same_initial_config": 191
+   }
+  },
+  "strata": {
+   "GorillaFileSystem": 13,
+   "GorillaFileSystem+MathAPI": 12,
+   "GorillaFileSystem+MessageAPI": 8,
+   "GorillaFileSystem+TicketAPI": 5,
+   "GorillaFileSystem+TwitterAPI": 12,
+   "MathAPI+TradingBot": 3,
+   "MathAPI+TravelAPI": 2,
+   "MathAPI+VehicleControlAPI": 5,
+   "MessageAPI+TradingBot": 10,
+   "MessageAPI+TravelAPI": 10,
+   "MessageAPI+VehicleControlAPI": 21,
+   "TicketAPI+TradingBot": 7,
+   "TicketAPI+TravelAPI": 15,
+   "TicketAPI+VehicleControlAPI": 2,
+   "TradingBot": 27,
+   "TradingBot+TwitterAPI": 3,
+   "TravelAPI": 13,
+   "TravelAPI+TwitterAPI": 10,
+   "TwitterAPI+VehicleControlAPI": 13,
+   "VehicleControlAPI": 9
+  }
+ },
+ "roles": {
+  "discovery": [
+   3,
+   5,
+   9,
+   11,
+   15,
+   20,
+   23,
+   33,
+   37,
+   44,
+   46,
+   47,
+   50,
+   53,
+   61,
+   62,
+   63,
+   67,
+   73,
+   76,
+   77,
+   83,
+   98,
+   105,
+   107,
+   111,
+   115,
+   116,
+   122,
+   129,
+   136,
+   137,
+   138,
+   140,
+   142,
+   144,
+   147,
+   163,
+   166,
+   169,
+   170,
+   175,
+   177,
+   180,
+   182,
+   187,
+   191,
+   196,
+   197,
+   198
+  ],
+  "gate": [
+   0,
+   7,
+   12,
+   14,
+   24,
+   39,
+   42,
+   45,
+   52,
+   71,
+   72,
+   78,
+   81,
+   91,
+   95,
+   102,
+   103,
+   123,
+   130,
+   132,
+   141,
+   146,
+   150,
+   151,
+   152,
+   162,
+   167,
+   168,
+   195,
+   199
+  ],
+  "test": [
+   1,
+   2,
+   4,
+   6,
+   8,
+   10,
+   13,
+   16,
+   17,
+   18,
+   19,
+   21,
+   22,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30,
+   31,
+   32,
+   34,
+   35,
+   36,
+   38,
+   40,
+   41,
+   43,
+   48,
+   49,
+   51,
+   54,
+   55,
+   56,
+   57,
+   58,
+   59,
+   60,
+   64,
+   65,
+   66,
+   68,
+   69,
+   70,
+   74,
+   75,
+   79,
+   80,
+   82,
+   84,
+   85,
+   86,
+   87,
+   88,
+   89,
+   90,
+   92,
+   93,
+   94,
+   96,
+   97,
+   99,
+   100,
+   101,
+   104,
+   106,
+   108,
+   109,
+   110,
+   112,
+   113,
+   114,
+   117,
+   118,
+   119,
+   120,
+   121,
+   124,
+   125,
+   126,
+   127,
+   128,
+   131,
+   133,
+   134,
+   135,
+   139,
+   143,
+   145,
+   148,
+   149,
+   153,
+   154,
+   155,
+   156,
+   157,
+   158,
+   159,
+   160,
+   161,
+   164,
+   165,
+   171,
+   172,
+   173,
+   174,
+   176,
+   178,
+   179,
+   181,
+   183,
+   184,
+   185,
+   186,
+   188,
+   189,
+   190,
+   192,
+   193,
+   194
+  ]
+ },
+ "roots": [
+  {
+   "cluster": 0,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_0",
+    "long_context": "multi_turn_long_context_0",
+    "miss_func": "multi_turn_miss_func_0",
+    "miss_param": "multi_turn_miss_param_0"
+   },
+   "role": "gate",
+   "root": 0,
+   "turns": 4
+  },
+  {
+   "cluster": 1,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_1",
+    "long_context": "multi_turn_long_context_1",
+    "miss_func": "multi_turn_miss_func_1",
+    "miss_param": "multi_turn_miss_param_1"
+   },
+   "role": "test",
+   "root": 1,
+   "turns": 4
+  },
+  {
+   "cluster": 2,
+   "domain": [
+    "GorillaFileSystem",
+    "TicketAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_2",
+    "long_context": "multi_turn_long_context_2",
+    "miss_func": "multi_turn_miss_func_2",
+    "miss_param": "multi_turn_miss_param_2"
+   },
+   "role": "test",
+   "root": 2,
+   "turns": 5
+  },
+  {
+   "cluster": 3,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_3",
+    "long_context": "multi_turn_long_context_3",
+    "miss_func": "multi_turn_miss_func_3",
+    "miss_param": "multi_turn_miss_param_3"
+   },
+   "role": "discovery",
+   "root": 3,
+   "turns": 2
+  },
+  {
+   "cluster": 4,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_4",
+    "long_context": "multi_turn_long_context_4",
+    "miss_func": "multi_turn_miss_func_4",
+    "miss_param": "multi_turn_miss_param_4"
+   },
+   "role": "test",
+   "root": 4,
+   "turns": 3
+  },
+  {
+   "cluster": 5,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_5",
+    "long_context": "multi_turn_long_context_5",
+    "miss_func": "multi_turn_miss_func_5",
+    "miss_param": "multi_turn_miss_param_5"
+   },
+   "role": "discovery",
+   "root": 5,
+   "turns": 4
+  },
+  {
+   "cluster": 6,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_6",
+    "long_context": "multi_turn_long_context_6",
+    "miss_func": "multi_turn_miss_func_6",
+    "miss_param": "multi_turn_miss_param_6"
+   },
+   "role": "test",
+   "root": 6,
+   "turns": 5
+  },
+  {
+   "cluster": 7,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_7",
+    "long_context": "multi_turn_long_context_7",
+    "miss_func": "multi_turn_miss_func_7",
+    "miss_param": "multi_turn_miss_param_7"
+   },
+   "role": "gate",
+   "root": 7,
+   "turns": 3
+  },
+  {
+   "cluster": 8,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_8",
+    "long_context": "multi_turn_long_context_8",
+    "miss_func": "multi_turn_miss_func_8",
+    "miss_param": "multi_turn_miss_param_8"
+   },
+   "role": "test",
+   "root": 8,
+   "turns": 4
+  },
+  {
+   "cluster": 9,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_9",
+    "long_context": "multi_turn_long_context_9",
+    "miss_func": "multi_turn_miss_func_9",
+    "miss_param": "multi_turn_miss_param_9"
+   },
+   "role": "discovery",
+   "root": 9,
+   "turns": 3
+  },
+  {
+   "cluster": 10,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_10",
+    "long_context": "multi_turn_long_context_10",
+    "miss_func": "multi_turn_miss_func_10",
+    "miss_param": "multi_turn_miss_param_10"
+   },
+   "role": "test",
+   "root": 10,
+   "turns": 5
+  },
+  {
+   "cluster": 11,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_11",
+    "long_context": "multi_turn_long_context_11",
+    "miss_func": "multi_turn_miss_func_11",
+    "miss_param": "multi_turn_miss_param_11"
+   },
+   "role": "discovery",
+   "root": 11,
+   "turns": 2
+  },
+  {
+   "cluster": 12,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_12",
+    "long_context": "multi_turn_long_context_12",
+    "miss_func": "multi_turn_miss_func_12",
+    "miss_param": "multi_turn_miss_param_12"
+   },
+   "role": "gate",
+   "root": 12,
+   "turns": 3
+  },
+  {
+   "cluster": 13,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_13",
+    "long_context": "multi_turn_long_context_13",
+    "miss_func": "multi_turn_miss_func_13",
+    "miss_param": "multi_turn_miss_param_13"
+   },
+   "role": "test",
+   "root": 13,
+   "turns": 2
+  },
+  {
+   "cluster": 14,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_14",
+    "long_context": "multi_turn_long_context_14",
+    "miss_func": "multi_turn_miss_func_14",
+    "miss_param": "multi_turn_miss_param_14"
+   },
+   "role": "gate",
+   "root": 14,
+   "turns": 4
+  },
+  {
+   "cluster": 15,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_15",
+    "long_context": "multi_turn_long_context_15",
+    "miss_func": "multi_turn_miss_func_15",
+    "miss_param": "multi_turn_miss_param_15"
+   },
+   "role": "discovery",
+   "root": 15,
+   "turns": 5
+  },
+  {
+   "cluster": 16,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_16",
+    "long_context": "multi_turn_long_context_16",
+    "miss_func": "multi_turn_miss_func_16",
+    "miss_param": "multi_turn_miss_param_16"
+   },
+   "role": "test",
+   "root": 16,
+   "turns": 3
+  },
+  {
+   "cluster": 17,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_17",
+    "long_context": "multi_turn_long_context_17",
+    "miss_func": "multi_turn_miss_func_17",
+    "miss_param": "multi_turn_miss_param_17"
+   },
+   "role": "test",
+   "root": 17,
+   "turns": 3
+  },
+  {
+   "cluster": 18,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_18",
+    "long_context": "multi_turn_long_context_18",
+    "miss_func": "multi_turn_miss_func_18",
+    "miss_param": "multi_turn_miss_param_18"
+   },
+   "role": "test",
+   "root": 18,
+   "turns": 3
+  },
+  {
+   "cluster": 19,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_19",
+    "long_context": "multi_turn_long_context_19",
+    "miss_func": "multi_turn_miss_func_19",
+    "miss_param": "multi_turn_miss_param_19"
+   },
+   "role": "test",
+   "root": 19,
+   "turns": 3
+  },
+  {
+   "cluster": 20,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_20",
+    "long_context": "multi_turn_long_context_20",
+    "miss_func": "multi_turn_miss_func_20",
+    "miss_param": "multi_turn_miss_param_20"
+   },
+   "role": "discovery",
+   "root": 20,
+   "turns": 2
+  },
+  {
+   "cluster": 21,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_21",
+    "long_context": "multi_turn_long_context_21",
+    "miss_func": "multi_turn_miss_func_21",
+    "miss_param": "multi_turn_miss_param_21"
+   },
+   "role": "test",
+   "root": 21,
+   "turns": 3
+  },
+  {
+   "cluster": 22,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_22",
+    "long_context": "multi_turn_long_context_22",
+    "miss_func": "multi_turn_miss_func_22",
+    "miss_param": "multi_turn_miss_param_22"
+   },
+   "role": "test",
+   "root": 22,
+   "turns": 4
+  },
+  {
+   "cluster": 23,
+   "domain": [
+    "GorillaFileSystem",
+    "TicketAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_23",
+    "long_context": "multi_turn_long_context_23",
+    "miss_func": "multi_turn_miss_func_23",
+    "miss_param": "multi_turn_miss_param_23"
+   },
+   "role": "discovery",
+   "root": 23,
+   "turns": 3
+  },
+  {
+   "cluster": 24,
+   "domain": [
+    "GorillaFileSystem",
+    "TicketAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_24",
+    "long_context": "multi_turn_long_context_24",
+    "miss_func": "multi_turn_miss_func_24",
+    "miss_param": "multi_turn_miss_param_24"
+   },
+   "role": "gate",
+   "root": 24,
+   "turns": 4
+  },
+  {
+   "cluster": 25,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_25",
+    "long_context": "multi_turn_long_context_25",
+    "miss_func": "multi_turn_miss_func_25",
+    "miss_param": "multi_turn_miss_param_25"
+   },
+   "role": "test",
+   "root": 25,
+   "turns": 4
+  },
+  {
+   "cluster": 26,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_26",
+    "long_context": "multi_turn_long_context_26",
+    "miss_func": "multi_turn_miss_func_26",
+    "miss_param": "multi_turn_miss_param_26"
+   },
+   "role": "test",
+   "root": 26,
+   "turns": 3
+  },
+  {
+   "cluster": 27,
+   "domain": [
+    "GorillaFileSystem",
+    "TicketAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_27",
+    "long_context": "multi_turn_long_context_27",
+    "miss_func": "multi_turn_miss_func_27",
+    "miss_param": "multi_turn_miss_param_27"
+   },
+   "role": "test",
+   "root": 27,
+   "turns": 3
+  },
+  {
+   "cluster": 28,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_28",
+    "long_context": "multi_turn_long_context_28",
+    "miss_func": "multi_turn_miss_func_28",
+    "miss_param": "multi_turn_miss_param_28"
+   },
+   "role": "test",
+   "root": 28,
+   "turns": 3
+  },
+  {
+   "cluster": 29,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_29",
+    "long_context": "multi_turn_long_context_29",
+    "miss_func": "multi_turn_miss_func_29",
+    "miss_param": "multi_turn_miss_param_29"
+   },
+   "role": "test",
+   "root": 29,
+   "turns": 3
+  },
+  {
+   "cluster": 30,
+   "domain": [
+    "GorillaFileSystem",
+    "TwitterAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_30",
+    "long_context": "multi_turn_long_context_30",
+    "miss_func": "multi_turn_miss_func_30",
+    "miss_param": "multi_turn_miss_param_30"
+   },
+   "role": "test",
+   "root": 30,
+   "turns": 2
+  },
+  {
+   "cluster": 31,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_31",
+    "long_context": "multi_turn_long_context_31",
+    "miss_func": "multi_turn_miss_func_31",
+    "miss_param": "multi_turn_miss_param_31"
+   },
+   "role": "test",
+   "root": 31,
+   "turns": 2
+  },
+  {
+   "cluster": 32,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_32",
+    "long_context": "multi_turn_long_context_32",
+    "miss_func": "multi_turn_miss_func_32",
+    "miss_param": "multi_turn_miss_param_32"
+   },
+   "role": "test",
+   "root": 32,
+   "turns": 2
+  },
+  {
+   "cluster": 33,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_33",
+    "long_context": "multi_turn_long_context_33",
+    "miss_func": "multi_turn_miss_func_33",
+    "miss_param": "multi_turn_miss_param_33"
+   },
+   "role": "discovery",
+   "root": 33,
+   "turns": 5
+  },
+  {
+   "cluster": 34,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_34",
+    "long_context": "multi_turn_long_context_34",
+    "miss_func": "multi_turn_miss_func_34",
+    "miss_param": "multi_turn_miss_param_34"
+   },
+   "role": "test",
+   "root": 34,
+   "turns": 2
+  },
+  {
+   "cluster": 35,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_35",
+    "long_context": "multi_turn_long_context_35",
+    "miss_func": "multi_turn_miss_func_35",
+    "miss_param": "multi_turn_miss_param_35"
+   },
+   "role": "test",
+   "root": 35,
+   "turns": 3
+  },
+  {
+   "cluster": 36,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_36",
+    "long_context": "multi_turn_long_context_36",
+    "miss_func": "multi_turn_miss_func_36",
+    "miss_param": "multi_turn_miss_param_36"
+   },
+   "role": "test",
+   "root": 36,
+   "turns": 3
+  },
+  {
+   "cluster": 37,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_37",
+    "long_context": "multi_turn_long_context_37",
+    "miss_func": "multi_turn_miss_func_37",
+    "miss_param": "multi_turn_miss_param_37"
+   },
+   "role": "discovery",
+   "root": 37,
+   "turns": 3
+  },
+  {
+   "cluster": 38,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_38",
+    "long_context": "multi_turn_long_context_38",
+    "miss_func": "multi_turn_miss_func_38",
+    "miss_param": "multi_turn_miss_param_38"
+   },
+   "role": "test",
+   "root": 38,
+   "turns": 2
+  },
+  {
+   "cluster": 39,
+   "domain": [
+    "GorillaFileSystem"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_39",
+    "long_context": "multi_turn_long_context_39",
+    "miss_func": "multi_turn_miss_func_39",
+    "miss_param": "multi_turn_miss_param_39"
+   },
+   "role": "gate",
+   "root": 39,
+   "turns": 4
+  },
+  {
+   "cluster": 40,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_40",
+    "long_context": "multi_turn_long_context_40",
+    "miss_func": "multi_turn_miss_func_40",
+    "miss_param": "multi_turn_miss_param_40"
+   },
+   "role": "test",
+   "root": 40,
+   "turns": 4
+  },
+  {
+   "cluster": 41,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_41",
+    "long_context": "multi_turn_long_context_41",
+    "miss_func": "multi_turn_miss_func_41",
+    "miss_param": "multi_turn_miss_param_41"
+   },
+   "role": "test",
+   "root": 41,
+   "turns": 2
+  },
+  {
+   "cluster": 42,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_42",
+    "long_context": "multi_turn_long_context_42",
+    "miss_func": "multi_turn_miss_func_42",
+    "miss_param": "multi_turn_miss_param_42"
+   },
+   "role": "gate",
+   "root": 42,
+   "turns": 3
+  },
+  {
+   "cluster": 40,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_43",
+    "long_context": "multi_turn_long_context_43",
+    "miss_func": "multi_turn_miss_func_43",
+    "miss_param": "multi_turn_miss_param_43"
+   },
+   "role": "test",
+   "root": 43,
+   "turns": 4
+  },
+  {
+   "cluster": 43,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_44",
+    "long_context": "multi_turn_long_context_44",
+    "miss_func": "multi_turn_miss_func_44",
+    "miss_param": "multi_turn_miss_param_44"
+   },
+   "role": "discovery",
+   "root": 44,
+   "turns": 3
+  },
+  {
+   "cluster": 44,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_45",
+    "long_context": "multi_turn_long_context_45",
+    "miss_func": "multi_turn_miss_func_45",
+    "miss_param": "multi_turn_miss_param_45"
+   },
+   "role": "gate",
+   "root": 45,
+   "turns": 2
+  },
+  {
+   "cluster": 45,
+   "domain": [
+    "GorillaFileSystem",
+    "MessageAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_46",
+    "long_context": "multi_turn_long_context_46",
+    "miss_func": "multi_turn_miss_func_46",
+    "miss_param": "multi_turn_miss_param_46"
+   },
+   "role": "discovery",
+   "root": 46,
+   "turns": 1
+  },
+  {
+   "cluster": 46,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_47",
+    "long_context": "multi_turn_long_context_47",
+    "miss_func": "multi_turn_miss_func_47",
+    "miss_param": "multi_turn_miss_param_47"
+   },
+   "role": "discovery",
+   "root": 47,
+   "turns": 3
+  },
+  {
+   "cluster": 47,
+   "domain": [
+    "GorillaFileSystem",
+    "TicketAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_48",
+    "long_context": "multi_turn_long_context_48",
+    "miss_func": "multi_turn_miss_func_48",
+    "miss_param": "multi_turn_miss_param_48"
+   },
+   "role": "test",
+   "root": 48,
+   "turns": 3
+  },
+  {
+   "cluster": 48,
+   "domain": [
+    "GorillaFileSystem",
+    "MathAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_49",
+    "long_context": "multi_turn_long_context_49",
+    "miss_func": "multi_turn_miss_func_49",
+    "miss_param": "multi_turn_miss_param_49"
+   },
+   "role": "test",
+   "root": 49,
+   "turns": 4
+  },
+  {
+   "cluster": 49,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_50",
+    "long_context": "multi_turn_long_context_50",
+    "miss_func": "multi_turn_miss_func_50",
+    "miss_param": "multi_turn_miss_param_50"
+   },
+   "role": "discovery",
+   "root": 50,
+   "turns": 1
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_51",
+    "long_context": "multi_turn_long_context_51",
+    "miss_func": "multi_turn_miss_func_51",
+    "miss_param": "multi_turn_miss_param_51"
+   },
+   "role": "test",
+   "root": 51,
+   "turns": 4
+  },
+  {
+   "cluster": 51,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_52",
+    "long_context": "multi_turn_long_context_52",
+    "miss_func": "multi_turn_miss_func_52",
+    "miss_param": "multi_turn_miss_param_52"
+   },
+   "role": "gate",
+   "root": 52,
+   "turns": 4
+  },
+  {
+   "cluster": 52,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_53",
+    "long_context": "multi_turn_long_context_53",
+    "miss_func": "multi_turn_miss_func_53",
+    "miss_param": "multi_turn_miss_param_53"
+   },
+   "role": "discovery",
+   "root": 53,
+   "turns": 4
+  },
+  {
+   "cluster": 53,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_54",
+    "long_context": "multi_turn_long_context_54",
+    "miss_func": "multi_turn_miss_func_54",
+    "miss_param": "multi_turn_miss_param_54"
+   },
+   "role": "test",
+   "root": 54,
+   "turns": 3
+  },
+  {
+   "cluster": 54,
+   "domain": [
+    "TicketAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_55",
+    "long_context": "multi_turn_long_context_55",
+    "miss_func": "multi_turn_miss_func_55",
+    "miss_param": "multi_turn_miss_param_55"
+   },
+   "role": "test",
+   "root": 55,
+   "turns": 5
+  },
+  {
+   "cluster": 55,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_56",
+    "long_context": "multi_turn_long_context_56",
+    "miss_func": "multi_turn_miss_func_56",
+    "miss_param": "multi_turn_miss_param_56"
+   },
+   "role": "test",
+   "root": 56,
+   "turns": 3
+  },
+  {
+   "cluster": 56,
+   "domain": [
+    "MathAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_57",
+    "long_context": "multi_turn_long_context_57",
+    "miss_func": "multi_turn_miss_func_57",
+    "miss_param": "multi_turn_miss_param_57"
+   },
+   "role": "test",
+   "root": 57,
+   "turns": 2
+  },
+  {
+   "cluster": 57,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_58",
+    "long_context": "multi_turn_long_context_58",
+    "miss_func": "multi_turn_miss_func_58",
+    "miss_param": "multi_turn_miss_param_58"
+   },
+   "role": "test",
+   "root": 58,
+   "turns": 4
+  },
+  {
+   "cluster": 55,
+   "domain": [
+    "MathAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_59",
+    "long_context": "multi_turn_long_context_59",
+    "miss_func": "multi_turn_miss_func_59",
+    "miss_param": "multi_turn_miss_param_59"
+   },
+   "role": "test",
+   "root": 59,
+   "turns": 5
+  },
+  {
+   "cluster": 58,
+   "domain": [
+    "TicketAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_60",
+    "long_context": "multi_turn_long_context_60",
+    "miss_func": "multi_turn_miss_func_60",
+    "miss_param": "multi_turn_miss_param_60"
+   },
+   "role": "test",
+   "root": 60,
+   "turns": 5
+  },
+  {
+   "cluster": 59,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_61",
+    "long_context": "multi_turn_long_context_61",
+    "miss_func": "multi_turn_miss_func_61",
+    "miss_param": "multi_turn_miss_param_61"
+   },
+   "role": "discovery",
+   "root": 61,
+   "turns": 4
+  },
+  {
+   "cluster": 60,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_62",
+    "long_context": "multi_turn_long_context_62",
+    "miss_func": "multi_turn_miss_func_62",
+    "miss_param": "multi_turn_miss_param_62"
+   },
+   "role": "discovery",
+   "root": 62,
+   "turns": 4
+  },
+  {
+   "cluster": 61,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_63",
+    "long_context": "multi_turn_long_context_63",
+    "miss_func": "multi_turn_miss_func_63",
+    "miss_param": "multi_turn_miss_param_63"
+   },
+   "role": "discovery",
+   "root": 63,
+   "turns": 3
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_64",
+    "long_context": "multi_turn_long_context_64",
+    "miss_func": "multi_turn_miss_func_64",
+    "miss_param": "multi_turn_miss_param_64"
+   },
+   "role": "test",
+   "root": 64,
+   "turns": 2
+  },
+  {
+   "cluster": 62,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_65",
+    "long_context": "multi_turn_long_context_65",
+    "miss_func": "multi_turn_miss_func_65",
+    "miss_param": "multi_turn_miss_param_65"
+   },
+   "role": "test",
+   "root": 65,
+   "turns": 2
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_66",
+    "long_context": "multi_turn_long_context_66",
+    "miss_func": "multi_turn_miss_func_66",
+    "miss_param": "multi_turn_miss_param_66"
+   },
+   "role": "test",
+   "root": 66,
+   "turns": 4
+  },
+  {
+   "cluster": 63,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_67",
+    "long_context": "multi_turn_long_context_67",
+    "miss_func": "multi_turn_miss_func_67",
+    "miss_param": "multi_turn_miss_param_67"
+   },
+   "role": "discovery",
+   "root": 67,
+   "turns": 4
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_68",
+    "long_context": "multi_turn_long_context_68",
+    "miss_func": "multi_turn_miss_func_68",
+    "miss_param": "multi_turn_miss_param_68"
+   },
+   "role": "test",
+   "root": 68,
+   "turns": 5
+  },
+  {
+   "cluster": 64,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_69",
+    "long_context": "multi_turn_long_context_69",
+    "miss_func": "multi_turn_miss_func_69",
+    "miss_param": "multi_turn_miss_param_69"
+   },
+   "role": "test",
+   "root": 69,
+   "turns": 2
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_70",
+    "long_context": "multi_turn_long_context_70",
+    "miss_func": "multi_turn_miss_func_70",
+    "miss_param": "multi_turn_miss_param_70"
+   },
+   "role": "test",
+   "root": 70,
+   "turns": 2
+  },
+  {
+   "cluster": 65,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_71",
+    "long_context": "multi_turn_long_context_71",
+    "miss_func": "multi_turn_miss_func_71",
+    "miss_param": "multi_turn_miss_param_71"
+   },
+   "role": "gate",
+   "root": 71,
+   "turns": 5
+  },
+  {
+   "cluster": 66,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_72",
+    "long_context": "multi_turn_long_context_72",
+    "miss_func": "multi_turn_miss_func_72",
+    "miss_param": "multi_turn_miss_param_72"
+   },
+   "role": "gate",
+   "root": 72,
+   "turns": 5
+  },
+  {
+   "cluster": 67,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_73",
+    "long_context": "multi_turn_long_context_73",
+    "miss_func": "multi_turn_miss_func_73",
+    "miss_param": "multi_turn_miss_param_73"
+   },
+   "role": "discovery",
+   "root": 73,
+   "turns": 3
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "MathAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_74",
+    "long_context": "multi_turn_long_context_74",
+    "miss_func": "multi_turn_miss_func_74",
+    "miss_param": "multi_turn_miss_param_74"
+   },
+   "role": "test",
+   "root": 74,
+   "turns": 2
+  },
+  {
+   "cluster": 68,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_75",
+    "long_context": "multi_turn_long_context_75",
+    "miss_func": "multi_turn_miss_func_75",
+    "miss_param": "multi_turn_miss_param_75"
+   },
+   "role": "test",
+   "root": 75,
+   "turns": 4
+  },
+  {
+   "cluster": 69,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_76",
+    "long_context": "multi_turn_long_context_76",
+    "miss_func": "multi_turn_miss_func_76",
+    "miss_param": "multi_turn_miss_param_76"
+   },
+   "role": "discovery",
+   "root": 76,
+   "turns": 2
+  },
+  {
+   "cluster": 70,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_77",
+    "long_context": "multi_turn_long_context_77",
+    "miss_func": "multi_turn_miss_func_77",
+    "miss_param": "multi_turn_miss_param_77"
+   },
+   "role": "discovery",
+   "root": 77,
+   "turns": 3
+  },
+  {
+   "cluster": 71,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_78",
+    "long_context": "multi_turn_long_context_78",
+    "miss_func": "multi_turn_miss_func_78",
+    "miss_param": "multi_turn_miss_param_78"
+   },
+   "role": "gate",
+   "root": 78,
+   "turns": 2
+  },
+  {
+   "cluster": 72,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_79",
+    "long_context": "multi_turn_long_context_79",
+    "miss_func": "multi_turn_miss_func_79",
+    "miss_param": "multi_turn_miss_param_79"
+   },
+   "role": "test",
+   "root": 79,
+   "turns": 3
+  },
+  {
+   "cluster": 73,
+   "domain": [
+    "MathAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_80",
+    "long_context": "multi_turn_long_context_80",
+    "miss_func": "multi_turn_miss_func_80",
+    "miss_param": "multi_turn_miss_param_80"
+   },
+   "role": "test",
+   "root": 80,
+   "turns": 5
+  },
+  {
+   "cluster": 74,
+   "domain": [
+    "MathAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_81",
+    "long_context": "multi_turn_long_context_81",
+    "miss_func": "multi_turn_miss_func_81",
+    "miss_param": "multi_turn_miss_param_81"
+   },
+   "role": "gate",
+   "root": 81,
+   "turns": 4
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_82",
+    "long_context": "multi_turn_long_context_82",
+    "miss_func": "multi_turn_miss_func_82",
+    "miss_param": "multi_turn_miss_param_82"
+   },
+   "role": "test",
+   "root": 82,
+   "turns": 3
+  },
+  {
+   "cluster": 61,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_83",
+    "long_context": "multi_turn_long_context_83",
+    "miss_func": "multi_turn_miss_func_83",
+    "miss_param": "multi_turn_miss_param_83"
+   },
+   "role": "discovery",
+   "root": 83,
+   "turns": 3
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_84",
+    "long_context": "multi_turn_long_context_84",
+    "miss_func": "multi_turn_miss_func_84",
+    "miss_param": "multi_turn_miss_param_84"
+   },
+   "role": "test",
+   "root": 84,
+   "turns": 2
+  },
+  {
+   "cluster": 73,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_85",
+    "long_context": "multi_turn_long_context_85",
+    "miss_func": "multi_turn_miss_func_85",
+    "miss_param": "multi_turn_miss_param_85"
+   },
+   "role": "test",
+   "root": 85,
+   "turns": 2
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_86",
+    "long_context": "multi_turn_long_context_86",
+    "miss_func": "multi_turn_miss_func_86",
+    "miss_param": "multi_turn_miss_param_86"
+   },
+   "role": "test",
+   "root": 86,
+   "turns": 3
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_87",
+    "long_context": "multi_turn_long_context_87",
+    "miss_func": "multi_turn_miss_func_87",
+    "miss_param": "multi_turn_miss_param_87"
+   },
+   "role": "test",
+   "root": 87,
+   "turns": 4
+  },
+  {
+   "cluster": 75,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_88",
+    "long_context": "multi_turn_long_context_88",
+    "miss_func": "multi_turn_miss_func_88",
+    "miss_param": "multi_turn_miss_param_88"
+   },
+   "role": "test",
+   "root": 88,
+   "turns": 3
+  },
+  {
+   "cluster": 76,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_89",
+    "long_context": "multi_turn_long_context_89",
+    "miss_func": "multi_turn_miss_func_89",
+    "miss_param": "multi_turn_miss_param_89"
+   },
+   "role": "test",
+   "root": 89,
+   "turns": 4
+  },
+  {
+   "cluster": 77,
+   "domain": [
+    "TwitterAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_90",
+    "long_context": "multi_turn_long_context_90",
+    "miss_func": "multi_turn_miss_func_90",
+    "miss_param": "multi_turn_miss_param_90"
+   },
+   "role": "test",
+   "root": 90,
+   "turns": 4
+  },
+  {
+   "cluster": 78,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_91",
+    "long_context": "multi_turn_long_context_91",
+    "miss_func": "multi_turn_miss_func_91",
+    "miss_param": "multi_turn_miss_param_91"
+   },
+   "role": "gate",
+   "root": 91,
+   "turns": 2
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_92",
+    "long_context": "multi_turn_long_context_92",
+    "miss_func": "multi_turn_miss_func_92",
+    "miss_param": "multi_turn_miss_param_92"
+   },
+   "role": "test",
+   "root": 92,
+   "turns": 5
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_93",
+    "long_context": "multi_turn_long_context_93",
+    "miss_func": "multi_turn_miss_func_93",
+    "miss_param": "multi_turn_miss_param_93"
+   },
+   "role": "test",
+   "root": 93,
+   "turns": 3
+  },
+  {
+   "cluster": 79,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_94",
+    "long_context": "multi_turn_long_context_94",
+    "miss_func": "multi_turn_miss_func_94",
+    "miss_param": "multi_turn_miss_param_94"
+   },
+   "role": "test",
+   "root": 94,
+   "turns": 3
+  },
+  {
+   "cluster": 80,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_95",
+    "long_context": "multi_turn_long_context_95",
+    "miss_func": "multi_turn_miss_func_95",
+    "miss_param": "multi_turn_miss_param_95"
+   },
+   "role": "gate",
+   "root": 95,
+   "turns": 5
+  },
+  {
+   "cluster": 77,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_96",
+    "long_context": "multi_turn_long_context_96",
+    "miss_func": "multi_turn_miss_func_96",
+    "miss_param": "multi_turn_miss_param_96"
+   },
+   "role": "test",
+   "root": 96,
+   "turns": 2
+  },
+  {
+   "cluster": 76,
+   "domain": [
+    "MessageAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_97",
+    "long_context": "multi_turn_long_context_97",
+    "miss_func": "multi_turn_miss_func_97",
+    "miss_param": "multi_turn_miss_param_97"
+   },
+   "role": "test",
+   "root": 97,
+   "turns": 6
+  },
+  {
+   "cluster": 81,
+   "domain": [
+    "MathAPI",
+    "VehicleControlAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_98",
+    "long_context": "multi_turn_long_context_98",
+    "miss_func": "multi_turn_miss_func_98",
+    "miss_param": "multi_turn_miss_param_98"
+   },
+   "role": "discovery",
+   "root": 98,
+   "turns": 3
+  },
+  {
+   "cluster": 50,
+   "domain": [
+    "VehicleControlAPI"
+   ],
+   "family": "vehicle",
+   "instances": {
+    "base": "multi_turn_base_99",
+    "long_context": "multi_turn_long_context_99",
+    "miss_func": "multi_turn_miss_func_99",
+    "miss_param": "multi_turn_miss_param_99"
+   },
+   "role": "test",
+   "root": 99,
+   "turns": 4
+  },
+  {
+   "cluster": 82,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_100",
+    "long_context": "multi_turn_long_context_100",
+    "miss_func": "multi_turn_miss_func_100",
+    "miss_param": "multi_turn_miss_param_100"
+   },
+   "role": "test",
+   "root": 100,
+   "turns": 2
+  },
+  {
+   "cluster": 83,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_101",
+    "long_context": "multi_turn_long_context_101",
+    "miss_func": "multi_turn_miss_func_101",
+    "miss_param": "multi_turn_miss_param_101"
+   },
+   "role": "test",
+   "root": 101,
+   "turns": 3
+  },
+  {
+   "cluster": 84,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_102",
+    "long_context": "multi_turn_long_context_102",
+    "miss_func": "multi_turn_miss_func_102",
+    "miss_param": "multi_turn_miss_param_102"
+   },
+   "role": "gate",
+   "root": 102,
+   "turns": 5
+  },
+  {
+   "cluster": 85,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_103",
+    "long_context": "multi_turn_long_context_103",
+    "miss_func": "multi_turn_miss_func_103",
+    "miss_param": "multi_turn_miss_param_103"
+   },
+   "role": "gate",
+   "root": 103,
+   "turns": 5
+  },
+  {
+   "cluster": 82,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_104",
+    "long_context": "multi_turn_long_context_104",
+    "miss_func": "multi_turn_miss_func_104",
+    "miss_param": "multi_turn_miss_param_104"
+   },
+   "role": "test",
+   "root": 104,
+   "turns": 2
+  },
+  {
+   "cluster": 86,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_105",
+    "long_context": "multi_turn_long_context_105",
+    "miss_func": "multi_turn_miss_func_105",
+    "miss_param": "multi_turn_miss_param_105"
+   },
+   "role": "discovery",
+   "root": 105,
+   "turns": 2
+  },
+  {
+   "cluster": 87,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_106",
+    "long_context": "multi_turn_long_context_106",
+    "miss_func": "multi_turn_miss_func_106",
+    "miss_param": "multi_turn_miss_param_106"
+   },
+   "role": "test",
+   "root": 106,
+   "turns": 4
+  },
+  {
+   "cluster": 88,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_107",
+    "long_context": "multi_turn_long_context_107",
+    "miss_func": "multi_turn_miss_func_107",
+    "miss_param": "multi_turn_miss_param_107"
+   },
+   "role": "discovery",
+   "root": 107,
+   "turns": 5
+  },
+  {
+   "cluster": 89,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_108",
+    "long_context": "multi_turn_long_context_108",
+    "miss_func": "multi_turn_miss_func_108",
+    "miss_param": "multi_turn_miss_param_108"
+   },
+   "role": "test",
+   "root": 108,
+   "turns": 5
+  },
+  {
+   "cluster": 90,
+   "domain": [
+    "TradingBot",
+    "TwitterAPI"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_109",
+    "long_context": "multi_turn_long_context_109",
+    "miss_func": "multi_turn_miss_func_109",
+    "miss_param": "multi_turn_miss_param_109"
+   },
+   "role": "test",
+   "root": 109,
+   "turns": 7
+  },
+  {
+   "cluster": 91,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_110",
+    "long_context": "multi_turn_long_context_110",
+    "miss_func": "multi_turn_miss_func_110",
+    "miss_param": "multi_turn_miss_param_110"
+   },
+   "role": "test",
+   "root": 110,
+   "turns": 6
+  },
+  {
+   "cluster": 92,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_111",
+    "long_context": "multi_turn_long_context_111",
+    "miss_func": "multi_turn_miss_func_111",
+    "miss_param": "multi_turn_miss_param_111"
+   },
+   "role": "discovery",
+   "root": 111,
+   "turns": 4
+  },
+  {
+   "cluster": 93,
+   "domain": [
+    "MathAPI",
+    "TradingBot"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_112",
+    "long_context": "multi_turn_long_context_112",
+    "miss_func": "multi_turn_miss_func_112",
+    "miss_param": "multi_turn_miss_param_112"
+   },
+   "role": "test",
+   "root": 112,
+   "turns": 4
+  },
+  {
+   "cluster": 82,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_113",
+    "long_context": "multi_turn_long_context_113",
+    "miss_func": "multi_turn_miss_func_113",
+    "miss_param": "multi_turn_miss_param_113"
+   },
+   "role": "test",
+   "root": 113,
+   "turns": 2
+  },
+  {
+   "cluster": 82,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_114",
+    "long_context": "multi_turn_long_context_114",
+    "miss_func": "multi_turn_miss_func_114",
+    "miss_param": "multi_turn_miss_param_114"
+   },
+   "role": "test",
+   "root": 114,
+   "turns": 5
+  },
+  {
+   "cluster": 94,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_115",
+    "long_context": "multi_turn_long_context_115",
+    "miss_func": "multi_turn_miss_func_115",
+    "miss_param": "multi_turn_miss_param_115"
+   },
+   "role": "discovery",
+   "root": 115,
+   "turns": 3
+  },
+  {
+   "cluster": 95,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_116",
+    "long_context": "multi_turn_long_context_116",
+    "miss_func": "multi_turn_miss_func_116",
+    "miss_param": "multi_turn_miss_param_116"
+   },
+   "role": "discovery",
+   "root": 116,
+   "turns": 6
+  },
+  {
+   "cluster": 96,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_117",
+    "long_context": "multi_turn_long_context_117",
+    "miss_func": "multi_turn_miss_func_117",
+    "miss_param": "multi_turn_miss_param_117"
+   },
+   "role": "test",
+   "root": 117,
+   "turns": 6
+  },
+  {
+   "cluster": 97,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_118",
+    "long_context": "multi_turn_long_context_118",
+    "miss_func": "multi_turn_miss_func_118",
+    "miss_param": "multi_turn_miss_param_118"
+   },
+   "role": "test",
+   "root": 118,
+   "turns": 5
+  },
+  {
+   "cluster": 98,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_119",
+    "long_context": "multi_turn_long_context_119",
+    "miss_func": "multi_turn_miss_func_119",
+    "miss_param": "multi_turn_miss_param_119"
+   },
+   "role": "test",
+   "root": 119,
+   "turns": 4
+  },
+  {
+   "cluster": 97,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_120",
+    "long_context": "multi_turn_long_context_120",
+    "miss_func": "multi_turn_miss_func_120",
+    "miss_param": "multi_turn_miss_param_120"
+   },
+   "role": "test",
+   "root": 120,
+   "turns": 3
+  },
+  {
+   "cluster": 99,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_121",
+    "long_context": "multi_turn_long_context_121",
+    "miss_func": "multi_turn_miss_func_121",
+    "miss_param": "multi_turn_miss_param_121"
+   },
+   "role": "test",
+   "root": 121,
+   "turns": 4
+  },
+  {
+   "cluster": 100,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_122",
+    "long_context": "multi_turn_long_context_122",
+    "miss_func": "multi_turn_miss_func_122",
+    "miss_param": "multi_turn_miss_param_122"
+   },
+   "role": "discovery",
+   "root": 122,
+   "turns": 4
+  },
+  {
+   "cluster": 101,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_123",
+    "long_context": "multi_turn_long_context_123",
+    "miss_func": "multi_turn_miss_func_123",
+    "miss_param": "multi_turn_miss_param_123"
+   },
+   "role": "gate",
+   "root": 123,
+   "turns": 4
+  },
+  {
+   "cluster": 97,
+   "domain": [
+    "MathAPI",
+    "TradingBot"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_124",
+    "long_context": "multi_turn_long_context_124",
+    "miss_func": "multi_turn_miss_func_124",
+    "miss_param": "multi_turn_miss_param_124"
+   },
+   "role": "test",
+   "root": 124,
+   "turns": 3
+  },
+  {
+   "cluster": 102,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_125",
+    "long_context": "multi_turn_long_context_125",
+    "miss_func": "multi_turn_miss_func_125",
+    "miss_param": "multi_turn_miss_param_125"
+   },
+   "role": "test",
+   "root": 125,
+   "turns": 5
+  },
+  {
+   "cluster": 103,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_126",
+    "long_context": "multi_turn_long_context_126",
+    "miss_func": "multi_turn_miss_func_126",
+    "miss_param": "multi_turn_miss_param_126"
+   },
+   "role": "test",
+   "root": 126,
+   "turns": 4
+  },
+  {
+   "cluster": 104,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_127",
+    "long_context": "multi_turn_long_context_127",
+    "miss_func": "multi_turn_miss_func_127",
+    "miss_param": "multi_turn_miss_param_127"
+   },
+   "role": "test",
+   "root": 127,
+   "turns": 4
+  },
+  {
+   "cluster": 105,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_128",
+    "long_context": "multi_turn_long_context_128",
+    "miss_func": "multi_turn_miss_func_128",
+    "miss_param": "multi_turn_miss_param_128"
+   },
+   "role": "test",
+   "root": 128,
+   "turns": 4
+  },
+  {
+   "cluster": 106,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_129",
+    "long_context": "multi_turn_long_context_129",
+    "miss_func": "multi_turn_miss_func_129",
+    "miss_param": "multi_turn_miss_param_129"
+   },
+   "role": "discovery",
+   "root": 129,
+   "turns": 4
+  },
+  {
+   "cluster": 107,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_130",
+    "long_context": "multi_turn_long_context_130",
+    "miss_func": "multi_turn_miss_func_130",
+    "miss_param": "multi_turn_miss_param_130"
+   },
+   "role": "gate",
+   "root": 130,
+   "turns": 5
+  },
+  {
+   "cluster": 105,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_131",
+    "long_context": "multi_turn_long_context_131",
+    "miss_func": "multi_turn_miss_func_131",
+    "miss_param": "multi_turn_miss_param_131"
+   },
+   "role": "test",
+   "root": 131,
+   "turns": 7
+  },
+  {
+   "cluster": 108,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_132",
+    "long_context": "multi_turn_long_context_132",
+    "miss_func": "multi_turn_miss_func_132",
+    "miss_param": "multi_turn_miss_param_132"
+   },
+   "role": "gate",
+   "root": 132,
+   "turns": 2
+  },
+  {
+   "cluster": 82,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_133",
+    "long_context": "multi_turn_long_context_133",
+    "miss_func": "multi_turn_miss_func_133",
+    "miss_param": "multi_turn_miss_param_133"
+   },
+   "role": "test",
+   "root": 133,
+   "turns": 2
+  },
+  {
+   "cluster": 109,
+   "domain": [
+    "MathAPI",
+    "TradingBot"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_134",
+    "long_context": "multi_turn_long_context_134",
+    "miss_func": "multi_turn_miss_func_134",
+    "miss_param": "multi_turn_miss_param_134"
+   },
+   "role": "test",
+   "root": 134,
+   "turns": 3
+  },
+  {
+   "cluster": 110,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_135",
+    "long_context": "multi_turn_long_context_135",
+    "miss_func": "multi_turn_miss_func_135",
+    "miss_param": "multi_turn_miss_param_135"
+   },
+   "role": "test",
+   "root": 135,
+   "turns": 4
+  },
+  {
+   "cluster": 88,
+   "domain": [
+    "MathAPI",
+    "TradingBot"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_136",
+    "long_context": "multi_turn_long_context_136",
+    "miss_func": "multi_turn_miss_func_136",
+    "miss_param": "multi_turn_miss_param_136"
+   },
+   "role": "discovery",
+   "root": 136,
+   "turns": 4
+  },
+  {
+   "cluster": 111,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_137",
+    "long_context": "multi_turn_long_context_137",
+    "miss_func": "multi_turn_miss_func_137",
+    "miss_param": "multi_turn_miss_param_137"
+   },
+   "role": "discovery",
+   "root": 137,
+   "turns": 4
+  },
+  {
+   "cluster": 112,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_138",
+    "long_context": "multi_turn_long_context_138",
+    "miss_func": "multi_turn_miss_func_138",
+    "miss_param": "multi_turn_miss_param_138"
+   },
+   "role": "discovery",
+   "root": 138,
+   "turns": 5
+  },
+  {
+   "cluster": 113,
+   "domain": [
+    "TradingBot",
+    "TwitterAPI"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_139",
+    "long_context": "multi_turn_long_context_139",
+    "miss_func": "multi_turn_miss_func_139",
+    "miss_param": "multi_turn_miss_param_139"
+   },
+   "role": "test",
+   "root": 139,
+   "turns": 2
+  },
+  {
+   "cluster": 114,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_140",
+    "long_context": "multi_turn_long_context_140",
+    "miss_func": "multi_turn_miss_func_140",
+    "miss_param": "multi_turn_miss_param_140"
+   },
+   "role": "discovery",
+   "root": 140,
+   "turns": 4
+  },
+  {
+   "cluster": 115,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_141",
+    "long_context": "multi_turn_long_context_141",
+    "miss_func": "multi_turn_miss_func_141",
+    "miss_param": "multi_turn_miss_param_141"
+   },
+   "role": "gate",
+   "root": 141,
+   "turns": 5
+  },
+  {
+   "cluster": 116,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_142",
+    "long_context": "multi_turn_long_context_142",
+    "miss_func": "multi_turn_miss_func_142",
+    "miss_param": "multi_turn_miss_param_142"
+   },
+   "role": "discovery",
+   "root": 142,
+   "turns": 5
+  },
+  {
+   "cluster": 117,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_143",
+    "long_context": "multi_turn_long_context_143",
+    "miss_func": "multi_turn_miss_func_143",
+    "miss_param": "multi_turn_miss_param_143"
+   },
+   "role": "test",
+   "root": 143,
+   "turns": 4
+  },
+  {
+   "cluster": 118,
+   "domain": [
+    "MathAPI",
+    "TradingBot"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_144",
+    "long_context": "multi_turn_long_context_144",
+    "miss_func": "multi_turn_miss_func_144",
+    "miss_param": "multi_turn_miss_param_144"
+   },
+   "role": "discovery",
+   "root": 144,
+   "turns": 2
+  },
+  {
+   "cluster": 119,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_145",
+    "long_context": "multi_turn_long_context_145",
+    "miss_func": "multi_turn_miss_func_145",
+    "miss_param": "multi_turn_miss_param_145"
+   },
+   "role": "test",
+   "root": 145,
+   "turns": 5
+  },
+  {
+   "cluster": 120,
+   "domain": [
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_146",
+    "long_context": "multi_turn_long_context_146",
+    "miss_func": "multi_turn_miss_func_146",
+    "miss_param": "multi_turn_miss_param_146"
+   },
+   "role": "gate",
+   "root": 146,
+   "turns": 4
+  },
+  {
+   "cluster": 121,
+   "domain": [
+    "TradingBot",
+    "TwitterAPI"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_147",
+    "long_context": "multi_turn_long_context_147",
+    "miss_func": "multi_turn_miss_func_147",
+    "miss_param": "multi_turn_miss_param_147"
+   },
+   "role": "discovery",
+   "root": 147,
+   "turns": 2
+  },
+  {
+   "cluster": 97,
+   "domain": [
+    "TicketAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_148",
+    "long_context": "multi_turn_long_context_148",
+    "miss_func": "multi_turn_miss_func_148",
+    "miss_param": "multi_turn_miss_param_148"
+   },
+   "role": "test",
+   "root": 148,
+   "turns": 5
+  },
+  {
+   "cluster": 122,
+   "domain": [
+    "MessageAPI",
+    "TradingBot"
+   ],
+   "family": "finance",
+   "instances": {
+    "base": "multi_turn_base_149",
+    "long_context": "multi_turn_long_context_149",
+    "miss_func": "multi_turn_miss_func_149",
+    "miss_param": "multi_turn_miss_param_149"
+   },
+   "role": "test",
+   "root": 149,
+   "turns": 5
+  },
+  {
+   "cluster": 123,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_150",
+    "long_context": "multi_turn_long_context_150",
+    "miss_func": "multi_turn_miss_func_150",
+    "miss_param": "multi_turn_miss_param_150"
+   },
+   "role": "gate",
+   "root": 150,
+   "turns": 2
+  },
+  {
+   "cluster": 124,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_151",
+    "long_context": "multi_turn_long_context_151",
+    "miss_func": "multi_turn_miss_func_151",
+    "miss_param": "multi_turn_miss_param_151"
+   },
+   "role": "gate",
+   "root": 151,
+   "turns": 3
+  },
+  {
+   "cluster": 125,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_152",
+    "long_context": "multi_turn_long_context_152",
+    "miss_func": "multi_turn_miss_func_152",
+    "miss_param": "multi_turn_miss_param_152"
+   },
+   "role": "gate",
+   "root": 152,
+   "turns": 3
+  },
+  {
+   "cluster": 126,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_153",
+    "long_context": "multi_turn_long_context_153",
+    "miss_func": "multi_turn_miss_func_153",
+    "miss_param": "multi_turn_miss_param_153"
+   },
+   "role": "test",
+   "root": 153,
+   "turns": 5
+  },
+  {
+   "cluster": 127,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_154",
+    "long_context": "multi_turn_long_context_154",
+    "miss_func": "multi_turn_miss_func_154",
+    "miss_param": "multi_turn_miss_param_154"
+   },
+   "role": "test",
+   "root": 154,
+   "turns": 5
+  },
+  {
+   "cluster": 128,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_155",
+    "long_context": "multi_turn_long_context_155",
+    "miss_func": "multi_turn_miss_func_155",
+    "miss_param": "multi_turn_miss_param_155"
+   },
+   "role": "test",
+   "root": 155,
+   "turns": 2
+  },
+  {
+   "cluster": 129,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_156",
+    "long_context": "multi_turn_long_context_156",
+    "miss_func": "multi_turn_miss_func_156",
+    "miss_param": "multi_turn_miss_param_156"
+   },
+   "role": "test",
+   "root": 156,
+   "turns": 5
+  },
+  {
+   "cluster": 130,
+   "domain": [
+    "MathAPI",
+    "TravelAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_157",
+    "long_context": "multi_turn_long_context_157",
+    "miss_func": "multi_turn_miss_func_157",
+    "miss_param": "multi_turn_miss_param_157"
+   },
+   "role": "test",
+   "root": 157,
+   "turns": 3
+  },
+  {
+   "cluster": 131,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_158",
+    "long_context": "multi_turn_long_context_158",
+    "miss_func": "multi_turn_miss_func_158",
+    "miss_param": "multi_turn_miss_param_158"
+   },
+   "role": "test",
+   "root": 158,
+   "turns": 3
+  },
+  {
+   "cluster": 132,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_159",
+    "long_context": "multi_turn_long_context_159",
+    "miss_func": "multi_turn_miss_func_159",
+    "miss_param": "multi_turn_miss_param_159"
+   },
+   "role": "test",
+   "root": 159,
+   "turns": 3
+  },
+  {
+   "cluster": 133,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_160",
+    "long_context": "multi_turn_long_context_160",
+    "miss_func": "multi_turn_miss_func_160",
+    "miss_param": "multi_turn_miss_param_160"
+   },
+   "role": "test",
+   "root": 160,
+   "turns": 3
+  },
+  {
+   "cluster": 134,
+   "domain": [
+    "MathAPI",
+    "TravelAPI"
+   ],
+   "family": "files",
+   "instances": {
+    "base": "multi_turn_base_161",
+    "long_context": "multi_turn_long_context_161",
+    "miss_func": "multi_turn_miss_func_161",
+    "miss_param": "multi_turn_miss_param_161"
+   },
+   "role": "test",
+   "root": 161,
+   "turns": 3
+  },
+  {
+   "cluster": 135,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_162",
+    "long_context": "multi_turn_long_context_162",
+    "miss_func": "multi_turn_miss_func_162",
+    "miss_param": "multi_turn_miss_param_162"
+   },
+   "role": "gate",
+   "root": 162,
+   "turns": 6
+  },
+  {
+   "cluster": 136,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_163",
+    "long_context": "multi_turn_long_context_163",
+    "miss_func": "multi_turn_miss_func_163",
+    "miss_param": "multi_turn_miss_param_163"
+   },
+   "role": "discovery",
+   "root": 163,
+   "turns": 2
+  },
+  {
+   "cluster": 137,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_164",
+    "long_context": "multi_turn_long_context_164",
+    "miss_func": "multi_turn_miss_func_164",
+    "miss_param": "multi_turn_miss_param_164"
+   },
+   "role": "test",
+   "root": 164,
+   "turns": 4
+  },
+  {
+   "cluster": 138,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_165",
+    "long_context": "multi_turn_long_context_165",
+    "miss_func": "multi_turn_miss_func_165",
+    "miss_param": "multi_turn_miss_param_165"
+   },
+   "role": "test",
+   "root": 165,
+   "turns": 5
+  },
+  {
+   "cluster": 139,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_166",
+    "long_context": "multi_turn_long_context_166",
+    "miss_func": "multi_turn_miss_func_166",
+    "miss_param": "multi_turn_miss_param_166"
+   },
+   "role": "discovery",
+   "root": 166,
+   "turns": 5
+  },
+  {
+   "cluster": 140,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_167",
+    "long_context": "multi_turn_long_context_167",
+    "miss_func": "multi_turn_miss_func_167",
+    "miss_param": "multi_turn_miss_param_167"
+   },
+   "role": "gate",
+   "root": 167,
+   "turns": 5
+  },
+  {
+   "cluster": 141,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_168",
+    "long_context": "multi_turn_long_context_168",
+    "miss_func": "multi_turn_miss_func_168",
+    "miss_param": "multi_turn_miss_param_168"
+   },
+   "role": "gate",
+   "root": 168,
+   "turns": 5
+  },
+  {
+   "cluster": 142,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_169",
+    "long_context": "multi_turn_long_context_169",
+    "miss_func": "multi_turn_miss_func_169",
+    "miss_param": "multi_turn_miss_param_169"
+   },
+   "role": "discovery",
+   "root": 169,
+   "turns": 2
+  },
+  {
+   "cluster": 143,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_170",
+    "long_context": "multi_turn_long_context_170",
+    "miss_func": "multi_turn_miss_func_170",
+    "miss_param": "multi_turn_miss_param_170"
+   },
+   "role": "discovery",
+   "root": 170,
+   "turns": 6
+  },
+  {
+   "cluster": 144,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_171",
+    "long_context": "multi_turn_long_context_171",
+    "miss_func": "multi_turn_miss_func_171",
+    "miss_param": "multi_turn_miss_param_171"
+   },
+   "role": "test",
+   "root": 171,
+   "turns": 3
+  },
+  {
+   "cluster": 145,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_172",
+    "long_context": "multi_turn_long_context_172",
+    "miss_func": "multi_turn_miss_func_172",
+    "miss_param": "multi_turn_miss_param_172"
+   },
+   "role": "test",
+   "root": 172,
+   "turns": 4
+  },
+  {
+   "cluster": 146,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_173",
+    "long_context": "multi_turn_long_context_173",
+    "miss_func": "multi_turn_miss_func_173",
+    "miss_param": "multi_turn_miss_param_173"
+   },
+   "role": "test",
+   "root": 173,
+   "turns": 4
+  },
+  {
+   "cluster": 147,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_174",
+    "long_context": "multi_turn_long_context_174",
+    "miss_func": "multi_turn_miss_func_174",
+    "miss_param": "multi_turn_miss_param_174"
+   },
+   "role": "test",
+   "root": 174,
+   "turns": 5
+  },
+  {
+   "cluster": 148,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_175",
+    "long_context": "multi_turn_long_context_175",
+    "miss_func": "multi_turn_miss_func_175",
+    "miss_param": "multi_turn_miss_param_175"
+   },
+   "role": "discovery",
+   "root": 175,
+   "turns": 2
+  },
+  {
+   "cluster": 149,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_176",
+    "long_context": "multi_turn_long_context_176",
+    "miss_func": "multi_turn_miss_func_176",
+    "miss_param": "multi_turn_miss_param_176"
+   },
+   "role": "test",
+   "root": 176,
+   "turns": 2
+  },
+  {
+   "cluster": 150,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_177",
+    "long_context": "multi_turn_long_context_177",
+    "miss_func": "multi_turn_miss_func_177",
+    "miss_param": "multi_turn_miss_param_177"
+   },
+   "role": "discovery",
+   "root": 177,
+   "turns": 2
+  },
+  {
+   "cluster": 151,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_178",
+    "long_context": "multi_turn_long_context_178",
+    "miss_func": "multi_turn_miss_func_178",
+    "miss_param": "multi_turn_miss_param_178"
+   },
+   "role": "test",
+   "root": 178,
+   "turns": 5
+  },
+  {
+   "cluster": 152,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_179",
+    "long_context": "multi_turn_long_context_179",
+    "miss_func": "multi_turn_miss_func_179",
+    "miss_param": "multi_turn_miss_param_179"
+   },
+   "role": "test",
+   "root": 179,
+   "turns": 4
+  },
+  {
+   "cluster": 153,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_180",
+    "long_context": "multi_turn_long_context_180",
+    "miss_func": "multi_turn_miss_func_180",
+    "miss_param": "multi_turn_miss_param_180"
+   },
+   "role": "discovery",
+   "root": 180,
+   "turns": 6
+  },
+  {
+   "cluster": 154,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_181",
+    "long_context": "multi_turn_long_context_181",
+    "miss_func": "multi_turn_miss_func_181",
+    "miss_param": "multi_turn_miss_param_181"
+   },
+   "role": "test",
+   "root": 181,
+   "turns": 5
+  },
+  {
+   "cluster": 155,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_182",
+    "long_context": "multi_turn_long_context_182",
+    "miss_func": "multi_turn_miss_func_182",
+    "miss_param": "multi_turn_miss_param_182"
+   },
+   "role": "discovery",
+   "root": 182,
+   "turns": 2
+  },
+  {
+   "cluster": 156,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_183",
+    "long_context": "multi_turn_long_context_183",
+    "miss_func": "multi_turn_miss_func_183",
+    "miss_param": "multi_turn_miss_param_183"
+   },
+   "role": "test",
+   "root": 183,
+   "turns": 6
+  },
+  {
+   "cluster": 157,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_184",
+    "long_context": "multi_turn_long_context_184",
+    "miss_func": "multi_turn_miss_func_184",
+    "miss_param": "multi_turn_miss_param_184"
+   },
+   "role": "test",
+   "root": 184,
+   "turns": 6
+  },
+  {
+   "cluster": 158,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_185",
+    "long_context": "multi_turn_long_context_185",
+    "miss_func": "multi_turn_miss_func_185",
+    "miss_param": "multi_turn_miss_param_185"
+   },
+   "role": "test",
+   "root": 185,
+   "turns": 3
+  },
+  {
+   "cluster": 159,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_186",
+    "long_context": "multi_turn_long_context_186",
+    "miss_func": "multi_turn_miss_func_186",
+    "miss_param": "multi_turn_miss_param_186"
+   },
+   "role": "test",
+   "root": 186,
+   "turns": 6
+  },
+  {
+   "cluster": 160,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_187",
+    "long_context": "multi_turn_long_context_187",
+    "miss_func": "multi_turn_miss_func_187",
+    "miss_param": "multi_turn_miss_param_187"
+   },
+   "role": "discovery",
+   "root": 187,
+   "turns": 4
+  },
+  {
+   "cluster": 161,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_188",
+    "long_context": "multi_turn_long_context_188",
+    "miss_func": "multi_turn_miss_func_188",
+    "miss_param": "multi_turn_miss_param_188"
+   },
+   "role": "test",
+   "root": 188,
+   "turns": 6
+  },
+  {
+   "cluster": 162,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_189",
+    "long_context": "multi_turn_long_context_189",
+    "miss_func": "multi_turn_miss_func_189",
+    "miss_param": "multi_turn_miss_param_189"
+   },
+   "role": "test",
+   "root": 189,
+   "turns": 3
+  },
+  {
+   "cluster": 163,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_190",
+    "long_context": "multi_turn_long_context_190",
+    "miss_func": "multi_turn_miss_func_190",
+    "miss_param": "multi_turn_miss_param_190"
+   },
+   "role": "test",
+   "root": 190,
+   "turns": 5
+  },
+  {
+   "cluster": 164,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_191",
+    "long_context": "multi_turn_long_context_191",
+    "miss_func": "multi_turn_miss_func_191",
+    "miss_param": "multi_turn_miss_param_191"
+   },
+   "role": "discovery",
+   "root": 191,
+   "turns": 5
+  },
+  {
+   "cluster": 165,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_192",
+    "long_context": "multi_turn_long_context_192",
+    "miss_func": "multi_turn_miss_func_192",
+    "miss_param": "multi_turn_miss_param_192"
+   },
+   "role": "test",
+   "root": 192,
+   "turns": 5
+  },
+  {
+   "cluster": 166,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_193",
+    "long_context": "multi_turn_long_context_193",
+    "miss_func": "multi_turn_miss_func_193",
+    "miss_param": "multi_turn_miss_param_193"
+   },
+   "role": "test",
+   "root": 193,
+   "turns": 4
+  },
+  {
+   "cluster": 167,
+   "domain": [
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_194",
+    "long_context": "multi_turn_long_context_194",
+    "miss_func": "multi_turn_miss_func_194",
+    "miss_param": "multi_turn_miss_param_194"
+   },
+   "role": "test",
+   "root": 194,
+   "turns": 6
+  },
+  {
+   "cluster": 168,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_195",
+    "long_context": "multi_turn_long_context_195",
+    "miss_func": "multi_turn_miss_func_195",
+    "miss_param": "multi_turn_miss_param_195"
+   },
+   "role": "gate",
+   "root": 195,
+   "turns": 4
+  },
+  {
+   "cluster": 169,
+   "domain": [
+    "TicketAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_196",
+    "long_context": "multi_turn_long_context_196",
+    "miss_func": "multi_turn_miss_func_196",
+    "miss_param": "multi_turn_miss_param_196"
+   },
+   "role": "discovery",
+   "root": 196,
+   "turns": 5
+  },
+  {
+   "cluster": 170,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_197",
+    "long_context": "multi_turn_long_context_197",
+    "miss_func": "multi_turn_miss_func_197",
+    "miss_param": "multi_turn_miss_param_197"
+   },
+   "role": "discovery",
+   "root": 197,
+   "turns": 3
+  },
+  {
+   "cluster": 171,
+   "domain": [
+    "TravelAPI",
+    "TwitterAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_198",
+    "long_context": "multi_turn_long_context_198",
+    "miss_func": "multi_turn_miss_func_198",
+    "miss_param": "multi_turn_miss_param_198"
+   },
+   "role": "discovery",
+   "root": 198,
+   "turns": 1
+  },
+  {
+   "cluster": 172,
+   "domain": [
+    "MessageAPI",
+    "TravelAPI"
+   ],
+   "family": "travel",
+   "instances": {
+    "base": "multi_turn_base_199",
+    "long_context": "multi_turn_long_context_199",
+    "miss_func": "multi_turn_miss_func_199",
+    "miss_param": "multi_turn_miss_param_199"
+   },
+   "role": "gate",
+   "root": 199,
+   "turns": 5
+  }
+ ],
+ "rules": {
+  "ground_truth_jaccard": 0.6,
+  "primary_categories": [
+   "base",
+   "long_context"
+  ],
+  "question_jaccard": 0.4,
+  "roles": [
+   "discovery",
+   "gate",
+   "test"
+  ],
+  "seed_label": "slh-bfcl-splits-v1",
+  "sibling_categories": [
+   "long_context",
+   "miss_func",
+   "miss_param"
+  ],
+  "sizes": {
+   "discovery": 50,
+   "gate": 30,
+   "test": 120
+  },
+  "stratum": "sorted involved_classes of the cluster's lowest root",
+  "test_never_feeds_learning": true
+ },
+ "schema": "xp-bfcl-splits-v1",
+ "sha256": "5fee084c7c405891870c6be0ac3feda4674c8fa65e13b7ee16b2bbb22e48b74c",
+ "sources": {
+  "data/BFCL_v4_multi_turn_base.json": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a",
+  "data/BFCL_v4_multi_turn_long_context.json": "78c3268c5cc8e97c0f4ec6c811b3b9a2bba14323b1830b7a874b06d822749324",
+  "data/BFCL_v4_multi_turn_miss_func.json": "87d28ce10e37d864b72de85d5732eef2a867b241d6c1c99b4ae682c9e3ea921c",
+  "data/BFCL_v4_multi_turn_miss_param.json": "f0c66dda3795f5f53e3e1c0cc8ba0246b6761c8f58bdba8317203bf451ab8838",
+  "data/multi_turn_func_doc/gorilla_file_system.json": "c4c1b741c71e2a17c97a5dc9c4a91d89978c4eaece56494d14272d5df6c650e9",
+  "data/multi_turn_func_doc/math_api.json": "83fa31708c89442bdcf12ac4dfbe3be8663ec9183a1b1524a9fda98164bc7e0b",
+  "data/multi_turn_func_doc/message_api.json": "4d58ea933a5d2b280d7a52366617fb47fecd333d7b0e08e724db6fa12fb5f847",
+  "data/multi_turn_func_doc/posting_api.json": "87f9fc404a06e4107d7c366f1399c596440e84c16cb119faf374b2f532d86e8b",
+  "data/multi_turn_func_doc/ticket_api.json": "31324e0380782664fe82ba05bd23517808ad55692b45a5fe7c3d4d395fe4f0f8",
+  "data/multi_turn_func_doc/trading_bot.json": "1a7933fd8f0cb8fbec38aeae05cb8c24132747cad4904fe1c13ac3d01fc22c2d",
+  "data/multi_turn_func_doc/travel_booking.json": "f17b950c13adddf41d0848077df58788252e4c2e7cad5cfa71c8c4bf04f57b26",
+  "data/multi_turn_func_doc/vehicle_control.json": "0c8a66292844874ef7b168f343bc394d8615d2d9e1f4387999a9ee23011eac78",
+  "data/possible_answer/BFCL_v4_multi_turn_base.json": "1fee67823b317571649177dd89d63969feaae4e810cc7448ee55ba797fb7c8fc",
+  "data/possible_answer/BFCL_v4_multi_turn_long_context.json": "e82aa0e839c39d23c64a05834f7ae024d7c9738ec21738ecee78dc876e3d0d18",
+  "data/possible_answer/BFCL_v4_multi_turn_miss_func.json": "69e679b806d1c871b05393a4b95583bb973248e5b8d96c2d7f4ca05e29fc32e6",
+  "data/possible_answer/BFCL_v4_multi_turn_miss_param.json": "59c442901779e2c31c33abcd566d032e03736e5ad8069de2fe05489873046ecf"
+ },
+ "vendor": {
+  "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+  "license": "Apache-2.0",
+  "pypi": {
+   "name": "bfcl-eval",
+   "sdist_sha256": "4a3869673721fa59be93d8f55ca92d69ab5797058aed792149c6adafda064bc1",
+   "version": "2026.3.23",
+   "wheel": "bfcl_eval-2026.3.23-py3-none-any.whl",
+   "wheel_sha256": "3bb6dfa5f0c68ad403c9ec50b00db2bb3b4cc9b38ab1ff33f48fe30d853d3a0a"
+  },
+  "subdir": "berkeley-function-call-leaderboard",
+  "subtree": "112d6789512dabeb9969b4fb4c97348d1047198a",
+  "upstream": "https://github.com/ShishirPatil/gorilla"
+ }
+}

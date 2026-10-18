@@ -1,8 +1,8 @@
 Third-party material
 
 The benchmark tau2-bench (https://github.com/sierra-research/tau2-bench) is not
-included in this repository; scripts/xp/fetch_vendor.sh fetches it at a pinned
-commit. The cases under package/cases/ are derived from its retail domain data
+included in this repository; it is used at a pinned commit, verified by hash (for a
+disconnected node, the release asset tau2-bench-<commit>.tar.gz). The cases under package/cases/ are derived from its retail domain data
 (customers, orders, products, policy), which is distributed under this licence:
 
     MIT License
