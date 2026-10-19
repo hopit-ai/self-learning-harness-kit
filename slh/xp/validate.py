@@ -53,9 +53,10 @@ def _money(value: float) -> str:
 
 def replay(messages: list[dict[str, Any]]) -> None:
     from tau2.data_model.message import ToolCall
-    from tau2.registry import registry
 
-    env = registry.get_env_constructor("retail")()
+    from slh.xp.tasks.common import new_env
+
+    env = new_env()  # the active database (slh.xp.retaildb.use); original by default
     for i, m in enumerate(messages):
         for call in m.get("tool_calls") or []:
             result = messages[i + 1]
@@ -336,9 +337,18 @@ def validate_case(case: dict[str, Any], db: dict[str, Any], *, evidence: bool = 
 
 def validate_all(cases: list[dict[str, Any]], db: dict[str, Any] | None = None, *,
                  evidence: bool = True) -> dict[str, Any]:
-    if db is None:
-        from slh.xp.tasks.common import load_db
+    from slh.xp import retaildb
 
-        db = load_db()
-    bad = {c["case_id"]: p for c in cases if (p := validate_case(c, db, evidence=evidence))}
+    # The database the cases were built on (their generator's db_sha256; a pinned file).
+    shas = {(c.get("generator") or {}).get("db_sha256") for c in cases} - {None}
+    if len(shas) > 1:
+        raise ValueError("cases built on different retail databases")
+    name = retaildb.name_for_sha(shas.pop()) if shas else retaildb.active()
+    with retaildb.use(name):
+        if db is None:
+            from slh.xp.tasks.common import load_db
+
+            db = load_db()
+        bad = {c["case_id"]: p for c in cases
+               if (p := validate_case(c, db, evidence=evidence))}
     return {"ok": not bad, "checked": len(cases), "failures": bad}

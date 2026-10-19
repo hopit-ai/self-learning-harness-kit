@@ -256,10 +256,22 @@ def _draw(rows: list[dict[str, Any]], rng: random.Random, split: str,
 
 
 def plan_and_pick(db: dict[str, Any], sizes: dict[str, int], seed: int,
-                  user_split: dict[str, str] | None = None
+                  user_split: dict[str, str] | None = None,
+                  families: dict[tuple[str, int], tuple[str, int]] | None = None,
+                  exclude: frozenset[tuple[str, str]] | None = None
                   ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     """(slot, configuration) per group, splits in order train -> validation ->
-    sentinel -> test (so a smaller test set is a prefix of a larger one)."""
+    sentinel -> test (so a smaller test set is a prefix of a larger one).
+    ``families`` (optional; (split, index) -> (pattern, style)) pins a slot's family: no
+    fallback to another family, an exhausted pinned family raises (used to give two
+    populations one common slot specification; None keeps the default behaviour).
+    ``exclude`` (optional; (kind, pattern) pairs) removes those slot families from the
+    draw: a slot of that kind never takes that pattern (no fallback into it; a pinned
+    excluded family raises). Used by the synthetic-difficulty check, which excludes
+    ``ambiguous``/``city`` from both arms (too few synthetic configurations)."""
+    exclude = frozenset(exclude or ())
+    if bad := sorted(x for x in exclude if x[0] not in KINDS or x[1] not in PATTERNS):
+        raise ValueError(f"unknown excluded slot families: {bad}")
     by = pool(db)
     scarce = scarcity(db)
     fsplit = cm.family_split(TASK, PATTERNS)
@@ -275,8 +287,15 @@ def plan_and_pick(db: dict[str, Any], sizes: dict[str, int], seed: int,
         for i in range(sizes.get(split, 0)):
             kind = korder[i % len(korder)]
             start = (i % len(korder) + i // len(korder)) % len(fams)
-            order = sorted(range(len(fams)),
+            order = sorted((j for j in range(len(fams)) if (kind, fams[j][0]) not in exclude),
                            key=lambda j: (used[fams[j]], (j - start) % len(fams)))
+            if families is not None and (split, i) in families:
+                pinned = tuple(families[(split, i)])
+                if pinned not in fams:
+                    raise ValueError(f"pinned family {pinned} not in the {split} families")
+                if (kind, pinned[0]) in exclude:
+                    raise ValueError(f"pinned family {pinned} is excluded for {kind}")
+                order = [fams.index(pinned)]
             config = fam = None
             for avoid in (True, False):
                 for j in order:
@@ -426,9 +445,14 @@ def check_case(case: dict[str, Any]) -> list[str]:
 
 def generate(db: dict[str, Any] | None = None, *, seed: int = cm.SEED,
              sizes: dict[str, int] | None = None,
-             user_split: dict[str, str] | None = None) -> list[dict[str, Any]]:
+             user_split: dict[str, str] | None = None,
+             families: dict[tuple[str, int], tuple[str, int]] | None = None,
+             exclude: frozenset[tuple[str, str]] | None = None
+             ) -> list[dict[str, Any]]:
     """All cases in memory (train, validation, sentinel, test; groups contiguous).
-    ``user_split``: optional user -> split pre-assignment (users across tasks)."""
+    ``user_split``: optional user -> split pre-assignment (users across tasks).
+    ``families``: optional pinned slot families; ``exclude``: optional excluded
+    (kind, pattern) slot families (both ``plan_and_pick``)."""
     db = db or cm.load_db()
     sizes = sizes or cm.group_sizes()
     ctx = cm.context()
@@ -436,7 +460,7 @@ def generate(db: dict[str, Any] | None = None, *, seed: int = cm.SEED,
            "poc9_separation": "poc9 train+validation (user, target) pairs excluded; "
                               "poc9 test pairs avoided by manifest group hash"}
     out = []
-    for slot, config in plan_and_pick(db, sizes, seed, user_split):
+    for slot, config in plan_and_pick(db, sizes, seed, user_split, families, exclude):
         group = (f"xpag-"
                  f"{cm.sha(f'{cm.GEN_VERSION}|{seed}|{TASK}|{slot['split']}|{slot['index']}')[:8]}")
         for v in range(cm.VARIANTS):

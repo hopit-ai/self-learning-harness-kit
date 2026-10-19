@@ -7,9 +7,13 @@
 # wheel and its locked dependencies from the wheelhouse only, then runs the offline
 # readiness check (every network connection refused while it runs). Exit 0 = ready.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
 TARBALL="${1:?usage: $0 WHEELHOUSE_TARBALL [VENV]}"
+# A relative interpreter or path given by the caller is resolved against the
+# caller's directory now, before any cd (a bare command name stays a PATH lookup).
+case "$TARBALL" in /*) ;; *) TARBALL="$PWD/$TARBALL" ;; esac
 VENV="${2:-$HOME/bfcl-venv}"
+case "$VENV" in /*) ;; *) VENV="$PWD/$VENV" ;; esac
+cd "$(dirname "$0")/../.."
 TMP="$(mktemp -d)"
 tar xzf "$TARBALL" -C "$TMP"
 WH="$TMP/wheelhouse-bfcl"

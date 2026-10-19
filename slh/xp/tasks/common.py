@@ -88,12 +88,20 @@ def jsonl_text(rows: Iterable[dict[str, Any]]) -> str:
     return "".join(json.dumps(r, sort_keys=True, ensure_ascii=True) + "\n" for r in rows)
 
 
-def load_db(path: Path = DB_PATH) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+def load_db(path: Path | None = None) -> dict[str, Any]:
+    """The retail database (default: the active one, ``slh.xp.retaildb.use``; the
+    original ``db.json`` unless a builder selected the extension)."""
+    return json.loads(Path(path or db_path()).read_text(encoding="utf-8"))
 
 
-def db_sha256(path: Path = DB_PATH) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+def db_path() -> Path:
+    from slh.xp import retaildb
+
+    return retaildb.path(retaildb.active())
+
+
+def db_sha256(path: Path | None = None) -> str:
+    return hashlib.sha256(Path(path or db_path()).read_bytes()).hexdigest()
 
 
 def context() -> dict[str, Any]:
@@ -222,11 +230,12 @@ def _quiet() -> None:
 
 
 def new_env() -> Any:
-    """A fresh retail environment (its own DB copy; writes do not leak)."""
-    from tau2.registry import registry
+    """A fresh retail environment on the active database (its own DB copy; writes do
+    not leak). For the original database: tau2's registered ``retail`` constructor."""
+    from slh.xp import retaildb
 
     _quiet()
-    return registry.get_env_constructor("retail")()
+    return retaildb.env()
 
 
 # --------------------------------------------------------------------------- planning

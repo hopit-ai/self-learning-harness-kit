@@ -66,7 +66,19 @@ EXIT_HALT, EXIT_REFUSED, EXIT_NOGO, EXIT_INTERRUPTED = 3, 4, 5, 130
 FEASIBILITY_GATE = {"max_unparsed_step_share": 0.05, "max_inference_error_share": 0.02}
 STOP_GRACE_S = 10.0
 HALT_MARKERS = ("APIConnectionError", "Connection refused", "AuthenticationError",
-                "NotFoundError", "PermissionDeniedError", "ConnectError")
+                "NotFoundError", "PermissionDeniedError", "ConnectError",
+                # BFCL records ``f"Error during inference: {str(e)}"``: the OpenAI client's
+                # str() carries no class name, so the exact messages are matched too
+                # (APIConnectionError / APITimeoutError after its retries, and the
+                # token / route / gateway statuses); vLLM's 400 / 500 stay episode results.
+                "Error during inference: Connection error.",
+                "Error during inference: Request timed out.",
+                "Error during inference: Error code: 401",
+                "Error during inference: Error code: 403",
+                "Error during inference: Error code: 404",
+                "Error during inference: Error code: 502",
+                "Error during inference: Error code: 503",
+                "Error during inference: Error code: 504")
 SMOKE_UNITS = 2
 EXPORT_CAP_BYTES = 2_000_000_000  # uncompressed; the partner sends it as .tar.gz
 ENDPOINT_FIELDS = ("base_url", "model", "api_key_env", "model_revision", "vllm_version",
@@ -131,6 +143,28 @@ def claim(out: Path, ident: dict[str, Any]) -> None:
             raise Refused(f"{out} belongs to another run identity; use a new --out")
     else:
         path.write_text(json.dumps(ident, sort_keys=True))
+
+
+def generation_of(plan: dict[str, Any], endpoint: dict[str, Any] | None) -> dict[str, Any]:
+    """The output-length rule of the plan (B-P1) with ``context_len`` the served
+    ``--max-model-len`` when the endpoint records it (as BFCL reads the model's own
+    context length). A plan built before B-P1 gets the same rule (handler defaults)."""
+    from slh.xp.bfcl import handler as H
+
+    gen = dict(plan.get("generation") or {"max_output_tokens": H.MAX_OUTPUT_TOKENS,
+                                           "context_len": H.CONTEXT_LEN})
+    raw = (endpoint or {}).get("serving_args") or []
+    if isinstance(raw, str):
+        import shlex
+
+        raw = shlex.split(raw)
+    args = [str(a) for a in raw]
+    for k, a in enumerate(args):
+        if a == "--max-model-len" and k + 1 < len(args):
+            gen["context_len"] = int(args[k + 1])
+        elif a.startswith("--max-model-len="):
+            gen["context_len"] = int(a.split("=", 1)[1])
+    return gen
 
 
 def units_of(cell: dict[str, Any], smoke: bool) -> list[dict[str, Any]]:
@@ -263,7 +297,7 @@ def run_cell(plan: dict[str, Any], cell_id: str, cell_dir: Path, *, endpoint: di
                         base_url=endpoint.get("base_url") or "http://127.0.0.1:9/v1",
                         api_key=api_key, temperature=plan["decoding"]["temperature"],
                         sampling=plan["decoding"].get("sampling"),
-                        client=client)
+                        client=client, generation=generation_of(plan, endpoint))
     h.slh_notes_by_id = {u["instance"]: plan["notes"][u["notes_sha256"]]
                          for u in units if u.get("notes_sha256")}
     results = cell_dir / "results.jsonl"

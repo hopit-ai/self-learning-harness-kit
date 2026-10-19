@@ -33,7 +33,12 @@ plays three fixed commands in every game with no model and no GPU).
 
 Outputs per game (``games.jsonl``): success, steps, invalid commands ("Nothing
 happens."), the longest run of one repeated command, failure class, tokens, wall time and
-the full transcript (commands, feedback, raw replies). ``export`` writes
+the full transcript (commands, feedback, raw replies). A request the server rejects by its
+own request validation (HTTP 400/413/422 with vLLM's OpenAI-format error body, e.g. the
+context window exceeded on a long game) ends that game at once as a recorded failure
+(class ``request_rejected``, reason ``request_rejected:<code>``; never retried: a rerun
+gets the same answer); ``summary.json`` counts it as a failed game and reports it
+separately. ``export`` writes
 ``summary.json`` (success overall and per type, failure classes, the pre-declared go /
 no-go) next to the rows. Exit 3 = halted (the endpoint is unreachable; ``halt.json``);
 a rerun resumes (finished games are kept).
@@ -111,6 +116,15 @@ class Halt(RuntimeError):
     pass
 
 
+class Rejected(RuntimeError):
+    """The server rejected the request by its own validation (deterministic)."""
+
+    def __init__(self, code: int, message: str) -> None:
+        super().__init__(f"HTTP {code}: {message}")
+        self.code = code
+        self.message = message
+
+
 # --------------------------------------------------------------------------- games
 
 
@@ -173,6 +187,31 @@ def parse_command(reply: str) -> str | None:
     return None
 
 
+REJECT_STATUS = (400, 413, 422)  # request validation; recorded, never retried
+
+
+def validation_error(status: int, data: bytes) -> str | None:
+    """The message when ``data`` is vLLM's OpenAI-format error JSON for ``status``
+    (``{"object": "error", "message", "type", "code"}`` or ``{"error": {...}}``), else
+    None (HTML, a proxy's own body, a code that disagrees with the status)."""
+    try:
+        doc = json.loads(data)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(doc, dict):
+        return None
+    if doc.get("object") == "error":
+        err = doc
+    elif set(doc) == {"error"} and isinstance(doc["error"], dict):
+        err = doc["error"]
+    else:
+        return None
+    ok = (isinstance(err.get("message"), str) and bool(err["message"].strip())
+          and isinstance(err.get("type"), str) and bool(err["type"])
+          and type(err.get("code")) is int and err["code"] == status)
+    return err["message"] if ok else None
+
+
 def chat(endpoint: dict[str, Any], messages: list[dict[str, str]], seed: int,
          retries: int = 3) -> dict[str, Any]:
     body = {"model": endpoint["model"], "messages": messages, "seed": seed,
@@ -187,6 +226,16 @@ def chat(endpoint: dict[str, Any], messages: list[dict[str, str]], seed: int,
         try:
             with urllib.request.urlopen(req, timeout=300) as r:
                 return json.loads(r.read())
+        except urllib.error.HTTPError as exc:  # before URLError, its superclass
+            try:
+                data = exc.read()
+            except Exception:  # noqa: BLE001 - an unreadable body is not vLLM's answer
+                data = b""
+            msg = validation_error(exc.code, data) if exc.code in REJECT_STATUS else None
+            if msg is not None:
+                raise Rejected(exc.code, msg) from None
+            last = exc  # 5xx, 408/429, a proxy's own 4xx: retried, then halt
+            time.sleep(2 * (attempt + 1))
         except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
             last = exc
             time.sleep(2 * (attempt + 1))
@@ -212,8 +261,13 @@ def play(gamefile: Path, rel: str, *, endpoint: dict[str, Any] | None,
     prompt_tok = completion_tok = 0
     seed0 = int(hashlib.sha256(rel.encode()).hexdigest()[:8], 16)
     limit = len(DRY_COMMANDS) if endpoint is None else max_steps
+    rejected: Rejected | None = None
     for i in range(limit):
-        resp = dry_model(i) if endpoint is None else chat(endpoint, messages, seed0 + i)
+        try:
+            resp = dry_model(i) if endpoint is None else chat(endpoint, messages, seed0 + i)
+        except Rejected as exc:  # terminal for this game; recorded, not retried
+            rejected = exc
+            break
         reply = ((resp.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         usage = resp.get("usage") or {}
         prompt_tok += usage.get("prompt_tokens") or 0
@@ -236,7 +290,12 @@ def play(gamefile: Path, rel: str, *, endpoint: dict[str, Any] | None,
         run = run + 1 if a == b else 1
         best = max(best, run)
     n = len(steps)
-    if won:
+    extra: dict[str, Any] = {}
+    if rejected is not None:
+        cls = "request_rejected"  # the server refused a request (e.g. context overflow)
+        extra = {"reason": f"request_rejected:{rejected.code}",
+                 "rejection": rejected.message[:500]}
+    elif won:
         cls = "success"
     elif n and (invalid + unparsed) / n >= GO["format_invalid_share"]:
         cls = "format"           # commands the game does not accept, or no command
@@ -248,7 +307,7 @@ def play(gamefile: Path, rel: str, *, endpoint: dict[str, Any] | None,
             "invalid": invalid, "unparsed": unparsed, "max_repeat": best,
             "class": cls, "prompt_tokens": prompt_tok, "completion_tokens": completion_tok,
             "wall_s": round(time.time() - t0, 2), "first_observation": first,
-            "transcript": steps}
+            "transcript": steps, **extra}
 
 
 def _play_job(args: tuple[str, str, dict[str, Any] | None]) -> dict[str, Any]:
@@ -346,11 +405,16 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     success = wins / n if n else None
     proc_share = (classes.get("procedure", 0) + classes.get("loop", 0)) / len(fails) \
         if fails else None
+    rejected = Counter(r.get("reason", "request_rejected") for r in fails
+                       if r["class"] == "request_rejected")
     go = (success is not None and GO["success_min"] <= success <= GO["success_max"]
           and proc_share is not None and proc_share >= GO["procedural_share_min"]
           and classes.get("env_error", 0) == 0)
     return {"games": n, "won": wins, "success": success, "per_type": per_type,
             "failure_classes": dict(classes), "procedural_share_of_failures": proc_share,
+            # counted above as failed games; reported separately (request validation)
+            "request_rejected": {"games": sum(rejected.values()),
+                                 "by_reason": dict(sorted(rejected.items()))},
             "mean_steps": sum(r["steps"] for r in rows) / n if n else None,
             "invalid_command_share": (sum(r.get("invalid", 0) for r in rows)
                                       / max(1, sum(r["steps"] for r in rows))),

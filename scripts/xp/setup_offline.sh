@@ -10,16 +10,22 @@
 #      and verify it (commit, tree, data hashes);
 #   3. install from the wheelhouse only (pip --no-index --find-links). With
 #      --reuse-env, an existing environment (e.g. the phase-1 one with vLLM) keeps
-#      its packages: only the pinned benchmark is added (--no-deps) if missing,
-#      and the check then decides (package versions are not held to the lock);
+#      its packages: only the pinned benchmark is (re)bound to THIS kit's
+#      vendor/tau2-bench (--no-deps, offline) when it is missing or bound to another
+#      checkout (e.g. the phase-1 kit), an installed slh likewise, and the check then
+#      decides (package versions are not held to the lock);
 #   4. run the disconnected setup check (python -m slh.xp.partner.offline check).
 # Use the Python of the environment you run with: PYTHON=/path/to/python (default:
 # python3). Exit 0 = ready.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# A relative interpreter or path given by the caller is resolved against the
+# caller's directory now, before any cd (a bare command name stays a PATH lookup).
 ASSETS="${1:?usage: setup_offline.sh ASSETS_DIR [--reuse-env]}"
+case "$ASSETS" in /*) ;; *) ASSETS="$PWD/$ASSETS" ;; esac
 REUSE="${2:-}"
 PY="${PYTHON:-python3}"
+case "$PY" in /*|"") ;; */*) PY="$PWD/$PY" ;; esac
+cd "$(dirname "$0")/../.."
 export LITELLM_LOCAL_MODEL_COST_MAP=True   # never fetch litellm's price map
 export PIP_NO_INDEX=1
 COMMIT="$("$PY" -c 'from slh.xp.partner import vendor; print(vendor.COMMIT)')"
@@ -55,14 +61,56 @@ fi
 "$PY" -m slh.xp.partner.offline verify-wheelhouse --wheelhouse "$WH" \
   --lock "$WH/requirements.lock" >/dev/null || {
   echo "the wheelhouse is incomplete (see: $PY -m slh.xp.partner.offline verify-wheelhouse --wheelhouse $WH --lock $WH/requirements.lock)" >&2; exit 1; }
+KIT="$(pwd -P)"
+# Where MODULE resolves in this environment from outside the kit directory (the
+# installed binding, not the kit's own source tree); empty when it is not installed.
+resolved() {
+  (cd / && "$PY" -I -c 'import importlib.util as u, os, sys
+s = u.find_spec(sys.argv[1])
+print(os.path.realpath(s.origin) if s and s.origin else "")' "$1" 2>/dev/null) || true
+}
+# tau2 must be the editable install of THIS kit's vendor/tau2-bench. A reused
+# environment (e.g. phase 1's) may hold an editable tau2 bound to an older kit
+# checkout: rebind it here, offline, without dependencies.
+bind_tau2() {
+  case "$(resolved tau2)" in
+    "$KIT/vendor/tau2-bench/"*) return 0 ;;
+  esac
+  echo "binding tau2 to $KIT/vendor/tau2-bench (offline, --no-deps)" >&2
+  "$PY" -m pip install -q --no-index --find-links "$WH" --no-deps -e vendor/tau2-bench || {
+    echo "cannot install vendor/tau2-bench from the wheelhouse; fix: $PY -m pip install --no-index --find-links $WH --no-deps -e vendor/tau2-bench" >&2; exit 1; }
+  case "$(resolved tau2)" in
+    "$KIT/vendor/tau2-bench/"*) ;;
+    *) echo "tau2 still resolves to '$(resolved tau2)', not $KIT/vendor/tau2-bench; fix: $PY -m pip uninstall -y tau2 && rerun this script" >&2; exit 1 ;;
+  esac
+}
+# The kit runs from its own directory and is not installed. An slh installed in the
+# environment (e.g. an editable install of an older kit) would be imported instead
+# outside the kit directory: rebind it to this kit when it points elsewhere.
+bind_slh() {
+  local at; at="$(resolved slh)"
+  case "$at" in
+    ""|"$KIT/slh/"*) return 0 ;;
+  esac
+  echo "binding slh (installed at $at) to $KIT (offline, --no-deps)" >&2
+  # --no-build-isolation: the environment's own setuptools builds the editable binding.
+  "$PY" -m pip install -q --no-index --find-links "$WH" --no-deps --no-build-isolation -e . || {
+    echo "ERROR: cannot rebind slh (installed at $at) to $KIT: the offline editable install failed (see the pip output above; it needs setuptools in this environment). Fix: $PY -m pip uninstall -y slh (the kit runs from its directory) and rerun this script" >&2
+    exit 1; }
+  case "$(resolved slh)" in
+    ""|"$KIT/slh/"*) ;;
+    *) echo "slh resolves to '$(resolved slh)', not this kit; fix: $PY -m pip uninstall -y slh (the kit runs from its directory) and rerun this script" >&2; exit 1 ;;
+  esac
+}
 if [ "$REUSE" = "--reuse-env" ]; then
   # Keep the existing environment's packages (never install the lock over them);
-  # only add the pinned benchmark (no dependencies) if it is not installed yet.
-  "$PY" -c 'import tau2' 2>/dev/null || \
-    "$PY" -m pip install --no-index --find-links "$WH" --no-deps -e vendor/tau2-bench
+  # only (re)bind the pinned benchmark and slh to this kit (no dependencies).
+  bind_tau2
+  bind_slh
   exec "$PY" -m slh.xp.partner.offline check --assets "$ASSETS" --wheelhouse "$WH"
 fi
 "$PY" -m pip install --no-index --find-links "$WH" -r "$WH/requirements.lock"
-"$PY" -m pip install --no-index --find-links "$WH" --no-deps -e vendor/tau2-bench
+bind_tau2
+bind_slh
 exec "$PY" -m slh.xp.partner.offline check --assets "$ASSETS" --lock "$WH/requirements.lock" \
   --wheelhouse "$WH"

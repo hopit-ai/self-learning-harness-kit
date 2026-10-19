@@ -25,7 +25,23 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["slh", "slh.arms", "slh.learner", "slh.analysis", "slh.genpilot"]
+packages = [
+    "slh",
+    "slh.arms",
+    "slh.demo1",
+    "slh.guards",
+    "slh.learner",
+    "slh.poc9",
+    "slh.xp",
+    "slh.xp.alfworld",
+    "slh.xp.bfcl",
+    "slh.xp.fgate",
+    "slh.xp.learn",
+    "slh.xp.partner",
+    "slh.xp.partner_c",
+    "slh.xp.phase2",
+    "slh.xp.tasks",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -281,9 +281,10 @@ def expected_db_hash(key: dict[str, Any]) -> str:
     if key.get("official_task_id") is not None:
         return _official_gold(key)
     from tau2.data_model.message import ToolCall
-    from tau2.registry import registry
 
-    env = registry.get_env_constructor("retail")()
+    from slh.xp import retaildb
+
+    env = retaildb.env()  # the package's pinned database (build: retaildb.use)
     for i, w in enumerate(key["expected_writes"]):
         response = env.get_response(ToolCall(id=f"k{i}", name=w["name"],
                                              arguments=w["arguments"]))
@@ -324,12 +325,46 @@ def _official_gold(key: dict[str, Any]) -> str:
     return env.get_db_hash()
 
 
+def retail_db_of(registration: dict[str, Any]) -> str:
+    """The pinned retail database a package's generated scenarios use (``slh.xp.retaildb``;
+    a registration without ``retail_db`` is the original database)."""
+    return (registration.get("retail_db") or {}).get("name", "original")
+
+
+def tau2_domain(registration: dict[str, Any]) -> str:
+    """The tau2 domain conversations of this package run in: ``retail`` (original) or
+    the registered extension domain (same policy and tools, the pinned extension DB)."""
+    from slh.xp import retaildb
+
+    name = retail_db_of(registration)
+    if name != retaildb.ORIGINAL:
+        retaildb.register_domains()
+    return retaildb.domain(name)
+
+
+def benchmark_data_hashes(name: str = "original") -> dict[str, str]:
+    """The data files a run on database ``name`` reads (the runner's ``data_hashes``;
+    for the extension, ``db.json`` replaced by the pinned extension file)."""
+    from slh import runner
+    from slh.xp import retaildb
+
+    if name == retaildb.ORIGINAL:
+        return runner.data_hashes("retail")
+    return retaildb.data_hashes(retaildb.domain(name))
+
+
 def build(out: Path, keys_out: Path, *, plan: P.Phase2Plan,
           test: list[tuple[P.PublicScenario, dict[str, Any]]],
           smoke: list[tuple[P.PublicScenario, dict[str, Any]]],
           bundles: dict[str, Any], root: Path = pc.REPO,
-          check_plan: bool = True, calibration: bool = False) -> dict[str, Any]:
+          check_plan: bool = True, calibration: bool = False,
+          retail_db: str = "original") -> dict[str, Any]:
     """Write the package to ``out`` and the keys to ``keys_out`` (never inside it).
+
+    ``retail_db``: the pinned database the generated scenarios run and are scored on
+    (``slh.xp.retaildb``); recorded in the registration when not the original. Official
+    tau2 tasks always use the ORIGINAL database, so a package on the extension refuses
+    any official scenario.
 
     ``calibration``: a calibration package (generator v2's calib split in the smoke
     slot, run with ``run smoke`` / the pilot): it carries NO test scenario, so the
@@ -371,27 +406,34 @@ def build(out: Path, keys_out: Path, *, plan: P.Phase2Plan,
         problems.append("smoke scenarios must be generated (never official test tasks)")
     problems += leak_problems([*rows["test"], *rows["smoke"]], keys)
     problems += B.problems(bundles, plan)
+    if retail_db != "original" and any(r["source"] != "generated"
+                                       for split in SPLITS for r in rows[split]):
+        problems.append("official tau2 tasks always use the original retail database "
+                        f"(this package is on {retail_db})")
     if problems:
         raise PackageRefused("; ".join(problems[:20]))
-    for key in keys.values():
-        key["expected_db_sha256"] = expected_db_hash(key)
+    from slh.xp import retaildb
+
+    with retaildb.use(retail_db):
+        for key in keys.values():
+            key["expected_db_sha256"] = expected_db_hash(key)
     out.mkdir(parents=True, exist_ok=True)
     pc.write_json(out / "plan.json", plan_to_json(plan))
     for split, name in (("test", "scenarios.jsonl"), ("smoke", "smoke.jsonl")):
         raw, _ = pc.jsonl_bytes(sorted(rows[split], key=lambda r: r["scenario_id"]))
         (out / name).write_bytes(raw)
     pc.write_json(out / "bundles.json", bundles)
-    from slh.runner import data_hashes
-
     git = pc.git_state(root)
     registration = {"schema": PACKAGE_SCHEMA, "plan_id": plan.plan_id,
-                    "data_sha256": data_hashes("retail"),
+                    "data_sha256": benchmark_data_hashes(retail_db),
                     "files": {n: pc.sha_file(out / n) for n in PACKAGE_FILES},
                     "counts": {s: len(rows[s]) for s in SPLITS},
                     "code_sha256": pc.code_hashes(root)["code_sha256"],
                     "git_commit": git["git_commit"], "git_dirty": git["git_dirty"]}
     if calibration:
         registration["purpose"] = "calibration (no test scenarios; never evidence)"
+    if retail_db != "original":
+        registration["retail_db"] = retaildb.identity(retail_db)
     pc.write_json(out / "registration.json", registration)
     registration_sha = pc.sha_file(out / "registration.json")
     keys_out.parent.mkdir(parents=True, exist_ok=True)

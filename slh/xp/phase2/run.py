@@ -1052,6 +1052,9 @@ def _worker_main(out_str: str, package_str: str, session: int, index: int,
     if package.registration_sha256 != identity["package_registration_sha256"]:
         raise SystemExit(EXIT_REFUSED)
     rows = {r["scenario_id"]: r for split in PK.SPLITS for r in package.scenarios(split)}
+    # tau2 domain of this package's database (``retail`` unless the registration names
+    # the pinned extension; then the extension domain, registered in this process).
+    domain = PK.tau2_domain(package.registration)
     ledger = marked_ledger(out / "ledger.jsonl", config.cap_usd, owner=wid, session=session,
                           create=False, quarantine=runner.private_dir(out) / "quarantine.jsonl",
                           spend_mark=out / SPEND_MARK)
@@ -1112,7 +1115,7 @@ def _worker_main(out_str: str, package_str: str, session: int, index: int,
                     IG.active(job.arm in guard_arms) if guard_arms
                     else contextlib.nullcontext()):
                 result, reason = runner._run_pairs(
-                    DOMAIN, config, state, [(job.run, job.seed, tasks[job.scenario_id])],
+                    domain, config, state, [(job.run, job.seed, tasks[job.scenario_id])],
                     meter, sink, recorder, set(),
                     lambda o, box=box: box.__setitem__("outcome", o),
                     agent_level="messages", serving_pin=pin)
@@ -1499,7 +1502,7 @@ def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
         raise Refused(str(exc)) from None
     problems = endpoint_problems(endpoint) + B.problems(pkg.bundles, pkg.plan)
     want_data = pkg.registration.get("data_sha256")
-    have_data = runner.data_hashes(DOMAIN)
+    have_data = PK.benchmark_data_hashes(PK.retail_db_of(pkg.registration))
     if want_data is not None and want_data != have_data:
         problems.append("the benchmark data files differ from the registered ones")
     if problems:

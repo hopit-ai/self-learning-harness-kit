@@ -1,11 +1,8 @@
-# Plain runbook: plan xp-h1a-2026-10-18
+# Plain runbook: environment and servers (plan xp-h1b-2026-10-19)
 
-Normal Python, no job scripts: you start two vLLM servers, then run one Python command
-(rerun it to resume). Code snapshot `b16e954709cb6a72e434ff3953d2b46d0f37e6e9`, plan `b8081625aff874e1...`.
-Every integrity check runs inside Python: `python -m slh.xp.partner.runner` re-executes
-itself through `scripts/xp/xp_boot.py` (no bytecode written, a fresh bytecode cache, no
-import artifacts, every registered code file checked against `package/registration.json`),
-then the preflight, context guard, halts, resume and the credit latch work as before.
+Code snapshot `d9ce8aff72c0fe0dabcffac89b8a9728cb1676e0`. This kit runs no phase 1 and ships no phase-1
+package: the release's runbook (see README.md) names the packages and commands to run.
+Sections 1 and 2 below are the environment and the server settings it refers to.
 
 ## 1. Setup (Python 3.12, no network on the node)
 
@@ -85,33 +82,3 @@ identity); keep them and every server setting fixed for the whole run:
 }
 ```
 
-## 3. Run
-
-```bash
-P="--package package --endpoint endpoint.yaml"
-python -m slh.xp.partner.runner $P --out runs/dry --dry-run       # no GPU; "export ok"
-python -m slh.xp.partner.runner $P --out runs/smoke --smoke slice  # first run, 20 cases per task
-python -m slh.xp.partner.runner $P --out runs/xp                   # the full run
-```
-
-Rerun the same command after any interruption: finished rows are kept. Exit 3 = halted
-(cause in `runs/xp/halt.json`): fix it and rerun. Exit 4 = refused (code, package,
-benchmark or settings differ from the registration, or the run identity changed): tell us.
-
-## 4. Optional: check the smoke run
-
-```bash
-python -m slh.xp.partner.gate check-smoke --run runs/smoke --package package
-```
-
-Prints GO or NO-GO with reasons: the registered conditions (every arm instance with
-exactly its cases, context-limit shares, paired arms, serving settings within bounds,
-the export valid) on your smoke output. Nothing is chained or submitted.
-
-## 5. Send back
-
-The runner writes the export to `runs/xp/export/` (at most 100 MB). Send
-`tar czf xp-export.tar.gz -C runs/xp export` and, if you ran it, `runs/smoke/export/`.
-To re-export (or one shard per task if it does not fit):
-`python -m slh.xp.partner.export --run runs/xp --out export [--task <task>]`.
-Test answers stay with us: results are scored on our side.

@@ -20,6 +20,12 @@ a rerun resumes (finished units are skipped). Errors follow the phase-1 classes:
 run without a row (``halt.json``, exit 3; fix and rerun); per-case outcomes (time limit,
 context limit, malformed output) are final rows.
 
+**Interruption.** Ctrl-C (SIGINT) or SIGTERM stops the run promptly (about a second):
+queued units are cancelled, no new decision starts, and decisions still in flight are
+abandoned without a row (a row is only ever written for a decision that finished before
+the interruption). The run exits 130 and a rerun resumes the missing units. At a hard
+deadline stop the model server first (nothing more can be decided), then Ctrl-C.
+
 The export (at most ``export_cap_bytes``) holds ``decisions.jsonl.gz`` (allowlisted
 fields only), ``env.json`` and ``manifest.json``. Nothing in it is scored here: the
 answer keys stay with us.
@@ -51,6 +57,11 @@ ACTION_FIELDS = ("type", "name", "arguments", "content", "extra_calls", "reason"
 ENDPOINT_FINGERPRINT = ("base_url", "model", "api_key_env", "model_revision", "vllm_version",
                         "serving_args", "replicas", "concurrency")
 ABANDON_GRACE_S = 5.0
+POLL_S = 0.1  # how often the runner and the workers look at the stop flag
+
+
+class Interrupted(KeyboardInterrupt):
+    """Exit 130: Ctrl-C / SIGTERM; the run directory is resumable."""
 
 
 class Refused(RuntimeError):
@@ -139,8 +150,10 @@ def _clean(action: dict[str, Any]) -> dict[str, Any]:
 
 
 def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: bool = False,
-        smoke: bool = False, decider: Any = None, concurrency: int | None = None
-        ) -> dict[str, Any]:
+        smoke: bool = False, decider: Any = None, concurrency: int | None = None,
+        stop: threading.Event | None = None) -> dict[str, Any]:
+    """``stop`` (set by SIGINT/SIGTERM while running in the main thread, or by the
+    caller) ends the run promptly: see the module docstring, **Interruption**."""
     from slh.xp.partner.errors import RunHalted, classify, halt_record
 
     pkg = load_package(package)
@@ -177,6 +190,7 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
     conc = int(concurrency or endpoint.get("concurrency") or plan["limits"]["concurrency"])
     seed = int(plan["seed"])
     halted = threading.Event()
+    stop = stop if stop is not None else threading.Event()
     halt_info: dict[str, Any] = {}
     lock = threading.Lock()
 
@@ -198,7 +212,7 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
             halted.set()
 
     def one(unit: dict[str, Any]) -> dict[str, Any] | None:
-        if halted.is_set():
+        if halted.is_set() or stop.is_set():
             return None
         q = pkg["questions"][unit["case_id"]]
         text = pkg["prompts"][unit["notes_sha256"]]["text"]
@@ -218,7 +232,13 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
 
         t = threading.Thread(target=call, daemon=True)
         t.start()
-        t.join(limit_s + ABANDON_GRACE_S)
+        give_up = time.monotonic() + limit_s + ABANDON_GRACE_S
+        while t.is_alive() and not stop.is_set():  # wake on Ctrl-C: abandon, no row
+            t.join(max(0.0, min(POLL_S, give_up - time.monotonic())))
+            if time.monotonic() >= give_up:
+                break
+        if stop.is_set():
+            return None
         timed_out = t.is_alive()
         error = box.get("error")
         error_class = "case_time_limit" if timed_out else None
@@ -242,27 +262,47 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
 
     started = time.time()
     written = 0
-    with pc.GroupAppender(path) as sink, ThreadPoolExecutor(max_workers=max(1, conc)) as ex:
-        queue = iter(pending)
-        running: set[Any] = set()
+    previous = _catch_signals(stop)
+    ex = ThreadPoolExecutor(max_workers=max(1, conc))
+    try:
+        with pc.GroupAppender(path) as sink:
+            queue = iter(pending)
+            running: set[Any] = set()
 
-        def fill() -> None:
-            for u in queue:
-                running.add(ex.submit(one, u))
-                if len(running) >= conc * 2 or halted.is_set():
+            def fill() -> None:
+                for u in queue:
+                    if stop.is_set():
+                        break
+                    running.add(ex.submit(one, u))
+                    if len(running) >= conc * 2 or halted.is_set():
+                        break
+
+            fill()
+            while running and not stop.is_set():
+                finished, running = wait(running, timeout=POLL_S,
+                                         return_when=FIRST_COMPLETED)
+                if stop.is_set():  # nothing decided after the interruption is written
                     break
-
-        fill()
-        while running:
-            finished, running = wait(running, return_when=FIRST_COMPLETED)
-            rows = [r for r in (f.result() for f in finished) if r is not None]
-            sink.write(rows)
-            written += len(rows)
-            if not halted.is_set():
-                fill()
+                rows = [r for r in (f.result() for f in finished) if r is not None]
+                sink.write(rows)
+                written += len(rows)
+                if not halted.is_set():
+                    fill()
+            if stop.is_set():
+                for f in running:
+                    f.cancel()
+    finally:
+        # Queued units are cancelled; in-flight workers notice the stop flag within
+        # POLL_S and return without a row (their decision threads are daemons).
+        ex.shutdown(wait=not stop.is_set(), cancel_futures=True)
+        _restore_signals(previous)
     log = {"event": "run", "pending": len(pending), "written": written, "mode": mode,
            "smoke": smoke, "wall_s": round(time.time() - started, 3)}
+    if stop.is_set():
+        log["interrupted"] = True
     pc.append_jsonl(out / "logs.jsonl", [log])
+    if stop.is_set():
+        raise Interrupted(f"interrupted after {written} new rows; rerun to resume")
     if halted.is_set():
         pc.write_json(out / "halt.json", halt_info)
         raise RunHalted(halt_info.get("label", "halt"), halt_info.get("error", ""))
@@ -270,6 +310,30 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
     total = {r["unit_id"] for r in pc.read_jsonl(path)}
     complete = all(u["unit_id"] in total for u in units)
     return {**log, "units": len(units), "complete": complete}
+
+
+def _catch_signals(stop: threading.Event) -> dict[int, Any] | None:
+    """SIGINT/SIGTERM set ``stop`` instead of raising inside the wait (main thread only)."""
+    import signal
+
+    if threading.current_thread() is not threading.main_thread():
+        return None
+
+    def handler(signum: int, frame: Any) -> None:
+        stop.set()
+
+    previous = {}
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        previous[sig] = signal.getsignal(sig)
+        signal.signal(sig, handler)
+    return previous
+
+
+def _restore_signals(previous: dict[int, Any] | None) -> None:
+    import signal
+
+    for sig, h in (previous or {}).items():
+        signal.signal(sig, h)
 
 
 def env_report(endpoint: dict[str, Any], *, mode: str) -> dict[str, Any]:
@@ -381,6 +445,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"halted: {exc} (see {args.out}/halt.json); fix the cause and rerun",
               file=sys.stderr)
         return 3
+    except Interrupted as exc:
+        print(f"stopped: {exc} (the same command re-runs only the missing units)",
+              file=sys.stderr)
+        return 130
     print(json.dumps(res, indent=1))
     if args.dry_run and res["complete"]:
         export(args.out, args.out / "export")

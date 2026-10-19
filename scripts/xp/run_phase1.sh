@@ -16,6 +16,9 @@
 # checked for planted import artifacts and registered code before slh is imported.
 # --preflight: verification only (registration, benchmark, run identity).
 set -euo pipefail
+# A relative interpreter or path given by the caller is resolved against the
+# caller's directory now, before any cd (a bare command name stays a PATH lookup).
+case "${PYTHON:-}" in /*|"") ;; */*) PYTHON="$PWD/$PYTHON" ;; esac
 cd "$(dirname "$0")/../.."
 PY="${PYTHON:-.venv/bin/python}"
 [ -x "$PY" ] || PY=python3

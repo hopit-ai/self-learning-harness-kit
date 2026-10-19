@@ -1,0 +1,632 @@
+{
+ "clustering": "fgate-intent-rules-v1",
+ "excluded": [
+  {
+   "pos": 0,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 1,
+   "task": "address",
+   "text": "- WHEN User asks to change shipping address to match another order and explicitly approves proceeding without further confirmation THEN If the target order is uniquely identified by the description, execute the address modification immediately without asking for confirmation again."
+  },
+  {
+   "pos": 0,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 1,
+   "task": "variant",
+   "text": "- WHEN User explicitly approves proceeding without further confirmation and exactly one available variant matches all specified attributes THEN Execute the modification or exchange tool call immediately without asking for confirmation again."
+  },
+  {
+   "pos": 0,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 2,
+   "task": "variant",
+   "text": "- WHEN When exactly one available variant matches all user-specified attributes and the user has approved the general request (even if the specific variant ID was not yet shown) THEN Execute the modification or exchange tool call immediately; do not ask for confirmation of the specific variant details."
+  },
+  {
+   "pos": 0,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 4,
+   "task": "address",
+   "text": "- WHEN User asks to change shipping address to match another order and explicitly approves proceeding without further confirmation THEN If the reference order is uniquely identified, execute the address change immediately without asking for confirmation again."
+  },
+  {
+   "pos": 0,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 7,
+   "task": "variant",
+   "text": "- WHEN The user has already explicitly approved the modification and stated no further confirmation is needed, and exactly one available variant matches all specified attributes THEN Execute the modification tool call immediately without asking for confirmation again."
+  },
+  {
+   "pos": 1,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 8,
+   "task": "address",
+   "text": "- WHEN User asks to change shipping address to match another order and explicitly approves proceeding without further confirmation, and exactly one order matches the description THEN Execute the address modification immediately; do not ask for confirmation again."
+  },
+  {
+   "pos": 0,
+   "reason": "licenses a write without the user's confirmation of the specific change",
+   "run": 9,
+   "task": "address",
+   "text": "- WHEN The user has explicitly approved the action and instructed not to ask for confirmation again, and the target address is uniquely identified by their description THEN Execute the address modification tool immediately without asking for further confirmation."
+  }
+ ],
+ "lessons": [
+  {
+   "id": "L01",
+   "intent": "address-exec-after-specific-approval",
+   "members": [
+    {
+     "pos": 0,
+     "run": 5,
+     "task": "address"
+    }
+   ],
+   "n_members": 1,
+   "representative": {
+    "pos": 0,
+    "run": 5,
+    "task": "address"
+   },
+   "runs": [
+    5
+   ],
+   "sha256": "0a6ee051b05af8f71ac281dee19749103c76ec48b90c5c7a760e0b4969bdd21f",
+   "task": "address",
+   "text": "- WHEN The user has already explicitly approved the specific address change (including the target address) and instructed not to ask for confirmation again THEN Execute the address modification tool call immediately without asking for further confirmation.",
+   "tools": [
+    "modify_pending_order_address"
+   ]
+  },
+  {
+   "id": "L02",
+   "intent": "address-clarify-nonunique",
+   "members": [
+    {
+     "pos": 1,
+     "run": 1,
+     "task": "address"
+    },
+    {
+     "pos": 1,
+     "run": 4,
+     "task": "address"
+    },
+    {
+     "pos": 1,
+     "run": 5,
+     "task": "address"
+    },
+    {
+     "pos": 2,
+     "run": 5,
+     "task": "address"
+    },
+    {
+     "pos": 0,
+     "run": 8,
+     "task": "address"
+    },
+    {
+     "pos": 2,
+     "run": 8,
+     "task": "address"
+    },
+    {
+     "pos": 1,
+     "run": 9,
+     "task": "address"
+    }
+   ],
+   "n_members": 7,
+   "representative": {
+    "pos": 1,
+    "run": 1,
+    "task": "address"
+   },
+   "runs": [
+    1,
+    4,
+    5,
+    8,
+    9
+   ],
+   "sha256": "a73f5939077db2e78b5e59caca7e6e4b12455b9cfd1e92a8e19046f6ccdbd8d1",
+   "task": "address",
+   "text": "- WHEN User describes a target order by product or status but no single order matches the description exactly THEN Ask the user to clarify which order or address to use; do not guess or use a default address.",
+   "tools": [
+    "modify_pending_order_address"
+   ]
+  },
+  {
+   "id": "L03",
+   "intent": "variant-exec-after-specific-approval",
+   "members": [
+    {
+     "pos": 0,
+     "run": 0,
+     "task": "variant"
+    },
+    {
+     "pos": 0,
+     "run": 10,
+     "task": "variant"
+    }
+   ],
+   "n_members": 2,
+   "representative": {
+    "pos": 0,
+    "run": 10,
+    "task": "variant"
+   },
+   "runs": [
+    0,
+    10
+   ],
+   "sha256": "1374008519e9a98fa4785bdb7cdcf697955ff7f0bf0ae2ba50d546811e2636c1",
+   "task": "variant",
+   "text": "- WHEN Exactly one available variant matches all user-specified attributes and the user has explicitly confirmed the specific change details (including price difference) in the current turn THEN Execute the modification or exchange tool call immediately; do not ask for additional confirmation.",
+   "tools": [
+    "modify_pending_order_items",
+    "exchange_delivered_order_items"
+   ]
+  },
+  {
+   "id": "L04",
+   "intent": "variant-clarify-multiple",
+   "members": [
+    {
+     "pos": 1,
+     "run": 0,
+     "task": "variant"
+    },
+    {
+     "pos": 1,
+     "run": 1,
+     "task": "variant"
+    },
+    {
+     "pos": 1,
+     "run": 2,
+     "task": "variant"
+    },
+    {
+     "pos": 1,
+     "run": 7,
+     "task": "variant"
+    },
+    {
+     "pos": 2,
+     "run": 10,
+     "task": "variant"
+    }
+   ],
+   "n_members": 5,
+   "representative": {
+    "pos": 1,
+    "run": 0,
+    "task": "variant"
+   },
+   "runs": [
+    0,
+    1,
+    2,
+    7,
+    10
+   ],
+   "sha256": "15f5fd1739a27797a986dd1d168ff176db019b94b280888e0677c9c63ee14d45",
+   "task": "variant",
+   "text": "- WHEN When multiple available variants match the user-specified attributes THEN List the matching variants and ask the user to specify which one they want; do not select one automatically or proceed without clarification.",
+   "tools": [
+    "modify_pending_order_items",
+    "exchange_delivered_order_items"
+   ]
+  },
+  {
+   "id": "L05",
+   "intent": "variant-none-inform",
+   "members": [
+    {
+     "pos": 2,
+     "run": 1,
+     "task": "variant"
+    },
+    {
+     "pos": 3,
+     "run": 7,
+     "task": "variant"
+    }
+   ],
+   "n_members": 2,
+   "representative": {
+    "pos": 2,
+    "run": 1,
+    "task": "variant"
+   },
+   "runs": [
+    1,
+    7
+   ],
+   "sha256": "eaa3d3cec7ad428c768dcbb3abb2bf1e6bff3c7c665d537c7895be175190f8ac",
+   "task": "variant",
+   "text": "- WHEN User explicitly approves proceeding without further confirmation but no available variant matches the specified attributes THEN Inform the user that no matching item is available and ask how they wish to proceed.",
+   "tools": [
+    "modify_pending_order_items",
+    "exchange_delivered_order_items"
+   ]
+  },
+  {
+   "id": "L06",
+   "intent": "variant-confirm-unconfirmed",
+   "members": [
+    {
+     "pos": 2,
+     "run": 0,
+     "task": "variant"
+    },
+    {
+     "pos": 2,
+     "run": 2,
+     "task": "variant"
+    },
+    {
+     "pos": 2,
+     "run": 7,
+     "task": "variant"
+    },
+    {
+     "pos": 1,
+     "run": 10,
+     "task": "variant"
+    }
+   ],
+   "n_members": 4,
+   "representative": {
+    "pos": 2,
+    "run": 2,
+    "task": "variant"
+   },
+   "runs": [
+    0,
+    2,
+    7,
+    10
+   ],
+   "sha256": "b9585f5faf8fc88b862badf022bb092b6409ca825f5dd24aed4f3fc28bfdb0d0",
+   "task": "variant",
+   "text": "- WHEN When the user requests a modification or exchange but has not yet approved the general request (i.e., the agent has not yet presented the action details for confirmation) THEN Present the exact change details and ask for explicit confirmation; do not execute the tool call.",
+   "tools": [
+    "modify_pending_order_items",
+    "exchange_delivered_order_items"
+   ]
+  },
+  {
+   "id": "L07",
+   "intent": "sequence-address-first",
+   "members": [
+    {
+     "pos": 0,
+     "run": 0,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 1,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 2,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 3,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 4,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 5,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 6,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 7,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 8,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 9,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 10,
+     "task": "sequence"
+    },
+    {
+     "pos": 0,
+     "run": 11,
+     "task": "sequence"
+    }
+   ],
+   "n_members": 12,
+   "representative": {
+    "pos": 0,
+    "run": 2,
+    "task": "sequence"
+   },
+   "runs": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "sha256": "fdf7e31931070199c66752de54a822551a7db64dafea640b82db7d27aba58cdf",
+   "task": "sequence",
+   "text": "- WHEN User requests both address and item changes for a pending order THEN Process the address change first. Do not process the item change until the address change is completed, as item modification locks the order.",
+   "tools": [
+    "modify_pending_order_address",
+    "modify_pending_order_items"
+   ]
+  },
+  {
+   "id": "L08",
+   "intent": "sequence-ignore-skip-instruction",
+   "members": [
+    {
+     "pos": 2,
+     "run": 7,
+     "task": "sequence"
+    },
+    {
+     "pos": 2,
+     "run": 10,
+     "task": "sequence"
+    }
+   ],
+   "n_members": 2,
+   "representative": {
+    "pos": 2,
+    "run": 7,
+    "task": "sequence"
+   },
+   "runs": [
+    7,
+    10
+   ],
+   "sha256": "a8b164c2f2e6e83900d9477b245f025b44bc8e987a46d2ad76b54bbe74b05888",
+   "task": "sequence",
+   "text": "- WHEN User says 'no need to ask again' or 'don't confirm' for subsequent steps THEN Ignore this instruction if it skips explicit confirmation for a distinct action type (e.g., item change after address change). Always obtain explicit 'yes' for each specific action before execution.",
+   "tools": [
+    "modify_pending_order_address",
+    "modify_pending_order_items"
+   ]
+  },
+  {
+   "id": "L09",
+   "intent": "sequence-terse-confirmation",
+   "members": [
+    {
+     "pos": 2,
+     "run": 11,
+     "task": "sequence"
+    }
+   ],
+   "n_members": 1,
+   "representative": {
+    "pos": 2,
+    "run": 11,
+    "task": "sequence"
+   },
+   "runs": [
+    11
+   ],
+   "sha256": "41da4b3fae3347c7ad11e10020636433a66b388535ebbf5dc5946140f5ab293c",
+   "task": "sequence",
+   "text": "- WHEN WHEN presenting change details for confirmation THEN State only the specific action and parameters to be changed and ask for a yes/no confirmation. Do not include internal reasoning or policy explanations THEN State only the specific action and parameters to be changed and ask for a yes/no confirmation. Do not include internal reasoning or policy explanations.",
+   "tools": [
+    "modify_pending_order_address",
+    "modify_pending_order_items"
+   ]
+  },
+  {
+   "id": "L10",
+   "intent": "sequence-list-only-first",
+   "members": [
+    {
+     "pos": 1,
+     "run": 1,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 2,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 6,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 8,
+     "task": "sequence"
+    },
+    {
+     "pos": 3,
+     "run": 8,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 9,
+     "task": "sequence"
+    },
+    {
+     "pos": 2,
+     "run": 9,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 10,
+     "task": "sequence"
+    }
+   ],
+   "n_members": 8,
+   "representative": {
+    "pos": 1,
+    "run": 2,
+    "task": "sequence"
+   },
+   "runs": [
+    1,
+    2,
+    6,
+    8,
+    9,
+    10
+   ],
+   "sha256": "c2c38e9b623d6448da51944726a5d7a8814bbbc0976b763d757046978c233c3e",
+   "task": "sequence",
+   "text": "- WHEN User requests multiple changes (e.g., address and items) in one turn THEN List details for the first change (address) and ask for explicit confirmation. Do not list or ask for confirmation for subsequent changes (items) until the first is completed.",
+   "tools": [
+    "modify_pending_order_address",
+    "modify_pending_order_items"
+   ]
+  },
+  {
+   "id": "L11",
+   "intent": "sequence-confirm-second-separately",
+   "members": [
+    {
+     "pos": 2,
+     "run": 0,
+     "task": "sequence"
+    },
+    {
+     "pos": 2,
+     "run": 4,
+     "task": "sequence"
+    },
+    {
+     "pos": 2,
+     "run": 5,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 7,
+     "task": "sequence"
+    },
+    {
+     "pos": 2,
+     "run": 8,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 11,
+     "task": "sequence"
+    }
+   ],
+   "n_members": 6,
+   "representative": {
+    "pos": 2,
+    "run": 0,
+    "task": "sequence"
+   },
+   "runs": [
+    0,
+    4,
+    5,
+    7,
+    8,
+    11
+   ],
+   "sha256": "51380d360c0f5dd889397427de0dea0f8d47eee391694637fc26d56a9ea1030f",
+   "task": "sequence",
+   "text": "- WHEN When processing sequential changes (e.g., address then item) where the first change is approved THEN Execute the first change. Then, list the details of the second change and ask for confirmation. Do not assume approval of the second change based on the first, even if the user previously said 'go ahead' for both.",
+   "tools": [
+    "modify_pending_order_address",
+    "modify_pending_order_items"
+   ]
+  },
+  {
+   "id": "L12",
+   "intent": "sequence-confirm-each-write",
+   "members": [
+    {
+     "pos": 1,
+     "run": 0,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 3,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 4,
+     "task": "sequence"
+    },
+    {
+     "pos": 1,
+     "run": 5,
+     "task": "sequence"
+    }
+   ],
+   "n_members": 4,
+   "representative": {
+    "pos": 1,
+    "run": 0,
+    "task": "sequence"
+   },
+   "runs": [
+    0,
+    3,
+    4,
+    5
+   ],
+   "sha256": "add81dfdf20f622c4cc9f20254e61f1b23fdc69b88a8f66993019d3616694536",
+   "task": "sequence",
+   "text": "- WHEN Before executing any database update action (address or item change) THEN List the specific details of that single action and obtain explicit user confirmation ('yes'). Do not execute the tool call if confirmation for that specific action has not been received.",
+   "tools": [
+    "modify_pending_order_address",
+    "modify_pending_order_items"
+   ]
+  }
+ ],
+ "lessons_read": 61,
+ "schema": "xp-fgate-pool-v1",
+ "screen": "fgate-policy-screen-v1",
+ "sha256": "97decef705e5368f73f074da89fc8684b54dbd3215bc9ca9786559f3b850fdbf",
+ "source_bundles_sha256": "53627519627a46273e70bb9f11c2de9db5505bf12edf48e2b89ce2ebf2efb42f",
+ "unclustered": []
+}

@@ -14,10 +14,15 @@
 # `python -m slh.xp.alfworld.check`. Everything is logged to alfworld-build/ (build log,
 # installed versions and licences, check output), which is sent back. Exit 0 = ready.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
 TARBALL="${1:?usage: $0 ARCHIVE [VENV] [DATA]}"
+# A relative interpreter or path given by the caller is resolved against the
+# caller's directory now, before any cd (a bare command name stays a PATH lookup).
+case "$TARBALL" in /*) ;; *) TARBALL="$PWD/$TARBALL" ;; esac
 VENV="${2:-$HOME/alfworld-venv}"
 DATA="${3:-$HOME/alfworld-data}"
+case "$VENV" in /*) ;; *) VENV="$PWD/$VENV" ;; esac
+case "$DATA" in /*) ;; *) DATA="$PWD/$DATA" ;; esac
+cd "$(dirname "$0")/../.."
 REC="$PWD/alfworld-build"
 mkdir -p "$REC"
 exec > >(tee "$REC/build.log") 2>&1

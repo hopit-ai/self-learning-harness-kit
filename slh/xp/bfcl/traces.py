@@ -13,7 +13,9 @@ Per cell (one arm x trial run) the exporter writes, under ``<out>/<cell_id>/``:
   is ``instance_state_mismatch``: the backend was left in a wrong state), ``inaction``
   (``empty_turn_model_response``), ``force_terminated``, ``inference_error``;
 - ``calls.jsonl``: one row per model call (episode id, step index, n messages sent,
-  finish reason, raw content, raw tool calls, usage, latency);
+  finish reason, raw content, raw tool calls, usage, latency, the ``max_tokens`` sent and
+  the prompt-token count it came from); ``finish_reason == "length"`` (stopped on the
+  B-P1 cap) is an ordinary step of the episode, not an inference error;
 - ``blobs/<sha256>.json``: system notes and tool lists, canonical JSON;
 - ``private/verdicts.jsonl``: the complete official verdicts (they contain ground-truth
   states and calls). **Never shown to a lesson writer**; only our audit code reads it.
@@ -153,7 +155,9 @@ def export_cell(cell: dict[str, Any], results: list[dict[str, Any]],
                           "raw_content": msg.get("content"),
                           "raw_tool_calls": _tool_calls(msg),
                           "raw_reasoning_content": msg.get("reasoning_content"),
-                          "usage": resp.get("usage"), "latency_s": c.get("latency_s")})
+                          "usage": resp.get("usage"), "latency_s": c.get("latency_s"),
+                          "max_tokens": c.get("max_tokens"),
+                          "prompt_tokens_counted": c.get("prompt_tokens_counted")})
     for name, rows in (("episodes.jsonl", eps), ("outcomes.jsonl", outs),
                        ("calls.jsonl", calls), ("private/verdicts.jsonl", priv)):
         with (out / name).open("w", encoding="utf-8") as f:

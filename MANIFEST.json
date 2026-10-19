@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "b16e954709cb6a72e434ff3953d2b46d0f37e6e9",
-  "tree": "b9583468ce4bedf583c9853535562725e0227de9"
+  "commit": "d9ce8aff72c0fe0dabcffac89b8a9728cb1676e0",
+  "tree": "cadd9d3dd5826ea5135bf3151e53dd735f03ab2c"
  },
  "files": {
   ".gitignore": {
@@ -20,14 +20,14 @@
    "sha256": "94fd626be3e6a82b8e13d7ca92dfaef3fc7c770c30f7e7ec30fb92e71874fe72"
   },
   "README-plain.md": {
-   "bytes": 7149,
+   "bytes": 5556,
    "mode": "644",
-   "sha256": "b982d324cca691e77d344f2176dac9f7d794f1744249a49b18a118540d87b6df"
+   "sha256": "ff2ed1dfa4b80d264d161fd192dd40217d343d16ac6eec3678fb845d2f5d941d"
   },
   "README.md": {
-   "bytes": 2321,
+   "bytes": 2234,
    "mode": "644",
-   "sha256": "b3a6c809863ed845f6a77a7739004833e01632edc05f086c79d7331b5af0827b"
+   "sha256": "3bc27999ba5622bb4e6f6679f08220fc21c8249f28944bda0a21c27cbf6f0abf"
   },
   "configs/a0-vllm.yaml": {
    "bytes": 1026,
@@ -79,100 +79,50 @@
    "mode": "644",
    "sha256": "e2abb8fb625ceedc34c01548e58a850e892ccc6717970547b8a3665ebc794537"
   },
-  "docs/xp/handoff1a-runbook.md": {
-   "bytes": 13067,
+  "docs/xp/handoff1b-runbook.md": {
+   "bytes": 9613,
    "mode": "644",
-   "sha256": "4a6f724fce8424c134691600632c1e35bf8ee21acead4804142cfa9024720c24"
+   "sha256": "3acfb9e06247364c2481836178c9fee7fc8b2701a81d9ac251e5aca1428ca577"
   },
-  "package-bfcl-h1/plan.json": {
-   "bytes": 18992,
+  "package-h1/README-h1.md": {
+   "bytes": 1191,
    "mode": "644",
-   "sha256": "23ceed2fcade14f37296e6915a7a5045a0a22b783422b902f8f334e40c0b5019"
+   "sha256": "e0c1e5d606244da4882669b1607e1bd323cf84fa03018df198c8837bf2393927"
   },
-  "package/cases/address-sentinel.jsonl": {
-   "bytes": 251779,
+  "package-h1/plan.json": {
+   "bytes": 13216,
    "mode": "644",
-   "sha256": "24ef167f3b3e429c475ee6b5d1b1dd7d34e99c0e022aa361d8f7f19624f2f764"
+   "sha256": "22231cd41d296498b7d54c64723aa715f9dfefd140a7d18c0a277cdce7e7a51f"
   },
-  "package/cases/address-test.questions.jsonl": {
-   "bytes": 8869874,
+  "package-h1/pool.json": {
+   "bytes": 15419,
    "mode": "644",
-   "sha256": "3950a225fb5c1ebbd849b1828b4afcee8e03577e725391cd1115b1efbaf0b0e7"
+   "sha256": "efbcc77a855cf1bba23fc17b3f669297607c2f2f415c83d57780c72de6b99381"
   },
-  "package/cases/address-train.jsonl": {
-   "bytes": 1258433,
+  "package-h1/prompts.jsonl": {
+   "bytes": 7263850,
    "mode": "644",
-   "sha256": "9a1ffd3dfad75843824a0d3ee977fe370ff9529258d513dea9a196878c2e7bdd"
+   "sha256": "58ac6e3a50b4018931cc3fc2dbaeb452ad608de5d9f11777a78a9efc5a3b4178"
   },
-  "package/cases/address-validation.jsonl": {
-   "bytes": 491375,
+  "package-h1/questions.jsonl": {
+   "bytes": 29291509,
    "mode": "644",
-   "sha256": "8e6713e56f74826ddb01c54a3ae2b4bca138309a304caf012e75b0adf0c5290a"
+   "sha256": "41da3265efa661c38984e8bb8dd1fe9b5bd51b67470636b18fb52b22dec0678c"
   },
-  "package/cases/sequence-sentinel.jsonl": {
-   "bytes": 265221,
+  "package-h1/units.jsonl": {
+   "bytes": 8110470,
    "mode": "644",
-   "sha256": "c84b91650d4239ff34cbf52fb0ca15b6c230e72827c46e487d9c167a86f6b4f0"
-  },
-  "package/cases/sequence-test.questions.jsonl": {
-   "bytes": 8220562,
-   "mode": "644",
-   "sha256": "fccfb7088df1d452b2c481ab3d4e74a4d2b536de60121bb021fff05d1507825a"
-  },
-  "package/cases/sequence-train.jsonl": {
-   "bytes": 3674085,
-   "mode": "644",
-   "sha256": "355ea10b7cb063211de41eb82a5b33c533c8d60bc1ca0714c17359f8542b4dc4"
-  },
-  "package/cases/sequence-validation.jsonl": {
-   "bytes": 546723,
-   "mode": "644",
-   "sha256": "697d004a118595bcfce6d260b6b5b42a2e76bbad2d41bc4af0db2ffdcf9cd887"
-  },
-  "package/cases/variant-sentinel.jsonl": {
-   "bytes": 231287,
-   "mode": "644",
-   "sha256": "7e1454593a25d43fb42af334e98a684ed1a43fc979d5b682d24b8d43e6494a5b"
-  },
-  "package/cases/variant-test.questions.jsonl": {
-   "bytes": 7345186,
-   "mode": "644",
-   "sha256": "b706431c48dc2bf17f060f65168d066a2926c75b73a9d199757b572de0a6029c"
-  },
-  "package/cases/variant-train.jsonl": {
-   "bytes": 3224566,
-   "mode": "644",
-   "sha256": "0b6dc36a88a7c93a07a5b0c252d1a2bd2d6be61475556ef51987a8d74ce233ec"
-  },
-  "package/cases/variant-validation.jsonl": {
-   "bytes": 470305,
-   "mode": "644",
-   "sha256": "789e63e2b563c799c0c2f2760a55c7e41b5ed66f79889ebbe022f9ab064cb67d"
-  },
-  "package/plan.json": {
-   "bytes": 48854,
-   "mode": "644",
-   "sha256": "fc904392b821b829e8525de28253fbc9f2ca19798e630927b95a46b14cdd23af"
-  },
-  "package/protocol.md": {
-   "bytes": 13631,
-   "mode": "644",
-   "sha256": "ef4a31ef9b38a36bfd81595947595bbfea350b54bce4c62b75b0b5bfc383dfb0"
-  },
-  "package/registration.json": {
-   "bytes": 12020,
-   "mode": "644",
-   "sha256": "f823814881686987f9028b96eccfcedef11ba2ba4a4586e6a60fcdea0e63a987"
+   "sha256": "1511a57ec1a8c1e6ff50cb7b728d6b9efd023cf195fee898cefb58cd78a85658"
   },
   "pyproject.toml": {
-   "bytes": 1226,
+   "bytes": 1443,
    "mode": "644",
-   "sha256": "70b3f5527403905694bcf893e01beee28ec24305f65cfac8220ef2b8f2d32d07"
+   "sha256": "be740d4de70d89f08198580ef6f607277c08c16bf51c42f532017af09ae94dc0"
   },
   "scripts/xp/fetch_vendor.sh": {
-   "bytes": 1080,
+   "bytes": 1307,
    "mode": "755",
-   "sha256": "a7dc67e19a9a484ea9655ca5754b69f276349e5364123ac2d1eba9aed9e3dd07"
+   "sha256": "96a0063e5118e5cefce2f832ebf54fe0a9e687bf31d3207b6a72d3cb5c05290b"
   },
   "scripts/xp/pack_export.sh": {
    "bytes": 1903,
@@ -180,24 +130,24 @@
    "sha256": "29c225352baa0691299dfd8f58065745fc2474904dc677a7b1dbe468beffc2d5"
   },
   "scripts/xp/run_phase1.sh": {
-   "bytes": 1669,
+   "bytes": 1896,
    "mode": "755",
-   "sha256": "bc04a9e84e3aefea7ab9d09350fb87de82a93838e9043d4964283f96ff8ade65"
+   "sha256": "f446ce45bbc313a82a253dda9619b17e9f410e1e15a6d0b8f7286b92edc1fce0"
   },
   "scripts/xp/setup_alfworld_offline.sh": {
-   "bytes": 3363,
+   "bytes": 3688,
    "mode": "755",
-   "sha256": "48a88999f32964c56a431bbddc14fdfa7db928418650c1208ced1cc471555eab"
+   "sha256": "ebb6aa80ea581d036ea488812bf9b09f6c9eafbe79bbad5773396169bba84532"
   },
   "scripts/xp/setup_bfcl_offline.sh": {
-   "bytes": 886,
+   "bytes": 1159,
    "mode": "755",
-   "sha256": "b39655ac9caad2ac9c45f242c1220c2529c44f9c4326165755266a87e37450f9"
+   "sha256": "0e13740353c1aa3263769f6f4ef40d0eb4b6efac9c244b0a11c44cf00a54aeea"
   },
   "scripts/xp/setup_offline.sh": {
-   "bytes": 3773,
+   "bytes": 6364,
    "mode": "755",
-   "sha256": "bef4ac34d39174c2a485df798107c5db0a0d9ef9d022f559884923713d1eff43"
+   "sha256": "58029156dd11807ce0d7158932de5109170d7ef698ba7b5d43619ddbf4052caa"
   },
   "scripts/xp/xp_boot.py": {
    "bytes": 6468,
@@ -520,9 +470,9 @@
    "sha256": "7ab5f34e630a58baeca133864584037791cb1a1ff94eb4c7d5e372ada108a7a9"
   },
   "slh/xp/alfworld/feasibility.py": {
-   "bytes": 19821,
+   "bytes": 22851,
    "mode": "644",
-   "sha256": "3fe299c1434ec4f4ce84271322e5f574c0de9d43e12ac91e901657ab43c446a8"
+   "sha256": "6d5c419354b170b5cb71f21f9f96b5f8da83694c1a8941a2b748ca3f08cd2747"
   },
   "slh/xp/bfcl/__init__.py": {
    "bytes": 0,
@@ -535,19 +485,19 @@
    "sha256": "bf0f369e6c3e74c575872ee613160829234eab1b44678a2de664400cd1a4756c"
   },
   "slh/xp/bfcl/handler.py": {
-   "bytes": 8529,
+   "bytes": 12928,
    "mode": "644",
-   "sha256": "7ffdb0002857333eb39ce2b38f36735eea7b6eb1bda87c0c67445b311952dc53"
+   "sha256": "910d895daf560423a5ac00f34330f173fd171cf90c9d64d13b489ac9fbc1c623"
   },
   "slh/xp/bfcl/plan.py": {
-   "bytes": 17764,
+   "bytes": 18760,
    "mode": "644",
-   "sha256": "15d53c0ef074902813afce16d834e23a5f84ccf15370afbab3f376566f691f96"
+   "sha256": "f774dec7dd335b706208bb74a19d1b3d13cf2a63b141133ad730c685dd0efc8b"
   },
   "slh/xp/bfcl/runner.py": {
-   "bytes": 30820,
+   "bytes": 32665,
    "mode": "644",
-   "sha256": "f61c67148513a189e5a7d02bfea534b50fbb35045cce9944077b65696fe748b3"
+   "sha256": "88fa6dc76ed34c03909ca973d2b6561909e332e731d5c797102e2fcde9ab0794"
   },
   "slh/xp/bfcl/splits.py": {
    "bytes": 14327,
@@ -555,9 +505,9 @@
    "sha256": "4c0eda9f34e0d91330792a5a9843adacd9bc4a2e21cb9b2d1d29585d65761f30"
   },
   "slh/xp/bfcl/traces.py": {
-   "bytes": 7530,
+   "bytes": 7859,
    "mode": "644",
-   "sha256": "61727fce6b9d046822d2aca0b9573d61a81d28e26278c69561c46c6cb1dbf42c"
+   "sha256": "2707f911373915020a41027177683d182d2c603af7ffabc359d6d30e866c3ff7"
   },
   "slh/xp/bfcl/vendor.py": {
    "bytes": 9016,
@@ -569,10 +519,30 @@
    "mode": "644",
    "sha256": "08bf4d4b6df1886f18c548711d0905ffb3532c6ce2ec3f3a6829cff313d33420"
   },
-  "slh/xp/fgate/units.py": {
-   "bytes": 17350,
+  "slh/xp/fgate/build.py": {
+   "bytes": 10878,
    "mode": "644",
-   "sha256": "2bfb699439e7c3b1fa66579e2f440bb18252c3da7ced15de31969c64c023b78a"
+   "sha256": "8a4bb9da330312df475ab149a9680bf31eed6a05f7a02a9058190dd4f0786e6d"
+  },
+  "slh/xp/fgate/design.py": {
+   "bytes": 26250,
+   "mode": "644",
+   "sha256": "357f7b669c30fcfe7e90307138c4f43158a572a969ccaf0f4462ff12f88078ec"
+  },
+  "slh/xp/fgate/difficulty_power.py": {
+   "bytes": 6864,
+   "mode": "644",
+   "sha256": "b488c631b65500c9d63f586df858cd43ec2e92b8d330c7456413200fb90691eb"
+  },
+  "slh/xp/fgate/pool.py": {
+   "bytes": 11875,
+   "mode": "644",
+   "sha256": "5d7875583f6bcb85676c3f188d19699f24ae11ab68239e8973230144f342f26d"
+  },
+  "slh/xp/fgate/units.py": {
+   "bytes": 20266,
+   "mode": "644",
+   "sha256": "e9009cdbeaf10591a64a9fc9c3f09f9bef77a5b791ce8a2b1c02fbfa2cebc303"
   },
   "slh/xp/learn/__init__.py": {
    "bytes": 399,
@@ -645,9 +615,9 @@
    "sha256": "f5a23858b72f2c2d279dff77cd3b2167fbfc34fa598ad65106958c8d399fc348"
   },
   "slh/xp/partner/offline.py": {
-   "bytes": 30430,
+   "bytes": 32224,
    "mode": "644",
-   "sha256": "ffc478dda124703dc7a2941a4ca0899010346e9c884b4b8a760ee86d958db503"
+   "sha256": "d70715b8a9dd7f1f2bc656259509c698fa1575ce326557ba42ffa3771019ff80"
   },
   "slh/xp/partner/phase1_registration.py": {
    "bytes": 32359,
@@ -679,6 +649,21 @@
    "mode": "644",
    "sha256": "bc93414e42b582d6040005871e59a7b6fe24f09c872a65368fc72fec2a6cc83a"
   },
+  "slh/xp/partner_c/__init__.py": {
+   "bytes": 640,
+   "mode": "644",
+   "sha256": "9ceb4d20f4a50c1adcddb9394ce6704f6ee9a7391dfe09f5cd9d936807a0cacf"
+  },
+  "slh/xp/partner_c/offline_extra.py": {
+   "bytes": 3261,
+   "mode": "644",
+   "sha256": "da7216d674a9d273406f03ad4146377f9a4ddb8148001685c2a2898b2906b834"
+  },
+  "slh/xp/partner_c/train.py": {
+   "bytes": 24093,
+   "mode": "644",
+   "sha256": "088f5657508794e9957da3873068cb7f41f9333457cc3a8638dcaaed8afec8b7"
+  },
   "slh/xp/phase2/__init__.py": {
    "bytes": 26412,
    "mode": "644",
@@ -695,14 +680,19 @@
    "sha256": "a9b0c6024dbb118d0f4eec7719c626e9b3569ddae10db7fcf5409d0019f0495f"
   },
   "slh/xp/phase2/package.py": {
-   "bytes": 27496,
+   "bytes": 29411,
    "mode": "644",
-   "sha256": "6c5f5ad21e084f118f53816a0fb44ddf70ce06f472ffcd8c8814aca82ecb47c5"
+   "sha256": "12312a62f5128662947cdb28c97cd09544369d53f4002c3471c7c755f80ed854"
   },
   "slh/xp/phase2/run.py": {
-   "bytes": 98512,
+   "bytes": 98766,
    "mode": "644",
-   "sha256": "7c419e945bb4c06940048cb40e43c49d582fb5083b4b5b150c794a18a3a845d2"
+   "sha256": "0802b67366e020dc16972aea783629fecf42042338bfc4fd647851bed18a5061"
+  },
+  "slh/xp/retaildb.py": {
+   "bytes": 7729,
+   "mode": "644",
+   "sha256": "773528218710d2521a7daf459ec0e380331c5d54eff62022e93855c9243544a8"
   },
   "slh/xp/score.py": {
    "bytes": 14736,
@@ -715,9 +705,9 @@
    "sha256": "d1d8628c3fdd04847f669f44dfccd4b94b07e9444f1598c7adff1b5f1bc09243"
   },
   "slh/xp/tasks/address.py": {
-   "bytes": 23725,
+   "bytes": 25452,
    "mode": "644",
-   "sha256": "92c02c6f7f825e05f9d55793c819b4214ea274d7ce91dbf17e55346e1ace5b64"
+   "sha256": "ca82ba1740d401f913ad2e623c4af9d837680f27ecaf8c537c74958128568b8e"
   },
   "slh/xp/tasks/cli.py": {
    "bytes": 4399,
@@ -725,9 +715,9 @@
    "sha256": "bb4775b7d7f7b83816c3c03e3ebbde3393f908706164abfddf7b17252858f668"
   },
   "slh/xp/tasks/common.py": {
-   "bytes": 19244,
+   "bytes": 19595,
    "mode": "644",
-   "sha256": "43f2cedbde42c42cd77428b79d64ad6b4ed4fb59410894085ac467fdc2cbedf2"
+   "sha256": "f8a3bfde1a8d66f7c720e535ec42b644c9690a95d8380f5761daa65a47adbae0"
   },
   "slh/xp/tasks/sequence.py": {
    "bytes": 15835,
@@ -740,9 +730,9 @@
    "sha256": "59c82a12f5bbb5a21b47a987852528c45b1e5fdecd0062bbb0e3f511a30d1d73"
   },
   "slh/xp/validate.py": {
-   "bytes": 16215,
+   "bytes": 16687,
    "mode": "644",
-   "sha256": "ccee761857caedfccba2942f8b07fd7b71e663d13b99fd24ee5d0d6d51db2b8b"
+   "sha256": "293d324fb513d5fe7f9b217dbf9527d0c427c75b3767c830eba8ed05e7510b38"
   },
   "splits/bfcl.json": {
    "bytes": 80601,
@@ -751,18 +741,19 @@
   }
  },
  "kit_repo": "hopit-ai/self-learning-harness-kit",
- "plan_id": "xp-h1a-2026-10-18",
- "plan_sha256": "b8081625aff874e1ab41ee47804a7118d4bea70e7571a50038b9b98eedddbedc",
- "registration_sha256": "f823814881686987f9028b96eccfcedef11ba2ba4a4586e6a60fcdea0e63a987",
+ "phase1_package": false,
+ "plan_id": "xp-h1b-2026-10-19",
+ "plan_sha256": null,
+ "registration_sha256": null,
  "release": {
   "assets": {
-   "alfworld-offline-linux-x86_64-py312.tar.gz": {
-    "bytes": 150697555,
-    "sha256": "777b1a8ee590ea07ea6ebe1d47f08b96442490b078f20163a5737e261f5578cd"
+   "db-ext-v2.json": {
+    "bytes": 28698817,
+    "sha256": "3d03098276f5b2dd2ec08988f11e4f3d239e7ac0d052991f63807f35760130e5"
    },
-   "alfworld-offline.sha256": {
-    "bytes": 109,
-    "sha256": "c8c3207b8b1b79036842e8ac3dca6e4d5288789514af85eb25a4f8ccee5c45f7"
+   "db-ext-v2.sha256": {
+    "bytes": 81,
+    "sha256": "b2992e6ab8518bb55782b6811d0dec7b7be9f739511e5766faecc890f7adf23d"
    },
    "offline-assets.json": {
     "bytes": 500,
@@ -772,54 +763,58 @@
     "bytes": 165984479,
     "sha256": "a65736d75b1f5cc712c3e068704c64ca7fd4592d0e7cc94248ef45f1c05afd76"
    },
-   "wheelhouse-bfcl-linux-x86_64-py312.tar.gz": {
-    "bytes": 106569207,
-    "sha256": "5cd8aed9d3c2a9e7d543bbc18f8b6051c7e6edffb8b2a92f3ba5950be8a8f34c"
-   },
-   "wheelhouse-bfcl.sha256": {
-    "bytes": 108,
-    "sha256": "c78e63ccaef9e63566376dfbe8cc3cf1357c77e5e5f4ebd891bcc0e308aaa32d"
-   },
    "wheelhouse-linux-x86_64-py312.tar.gz": {
     "bytes": 67497161,
     "sha256": "d67df2fa5518996ff5a5f74db92f27bfa1b800b73e744421882ced5b5405021e"
    }
   },
-  "handoff": "Hand-off 1a",
+  "handoff": "Hand-off 1b",
   "kit_repo": "hopit-ai/self-learning-harness-kit",
   "packages": {
-   "package-bfcl-h1": {
-    "cells": 3,
-    "decoding": {
-     "name": "sampled",
-     "sampling": {
-      "top_p": 0.8
-     },
-     "temperature": 0.7
+   "package-h1": {
+    "counts": {
+     "collect_units": 1530,
+     "difficulty_units": 1080,
+     "fgate_units": 20400,
+     "lessons": 12,
+     "prompts": 4051,
+     "questions": 3810,
+     "units": 23010
     },
-    "episodes": 200,
-    "plan_sha256": "324e981f2764aec8c13c75ecd69f0f93143949fb41117b98f36d5930dd667fb3",
-    "what": "part B: function-calling benchmark, feasibility then discovery"
+    "estimate": {
+     "basis": "1-3 decisions per second per H100 (phase-1 assumption 3/s with prefix caching; lesson-varied system prompts cache less)",
+     "cap_h100_hours": 6.5,
+     "h100_hours": "2.1-6.4",
+     "node_hours_8xh100": "0.27-0.80",
+     "within_cap": true
+    },
+    "plan_sha256": "d5251d7234f556e990e416b5411a310edba424822ea85630a3f64acd43d5c670",
+    "what": "part A: decision screen and proposal collection (F' / C)"
    }
   },
   "part_names": {
-   "B": "function-calling benchmark: oracle check, feasibility barrier, discovery",
-   "C": "household text games: offline dependency build and feasibility check"
+   "A": "decision screen and proposal collection"
   },
   "parts": [
-   "B",
-   "C"
+   "A"
   ],
+  "phase1_package": false,
   "rehearsal": false,
-  "runbook": "docs/xp/handoff1a-runbook.md",
+  "retail_db": {
+   "domain": "retail-ext-v2",
+   "file": "db-ext-v2.json",
+   "name": "ext-v2",
+   "sha256": "3d03098276f5b2dd2ec08988f11e4f3d239e7ac0d052991f63807f35760130e5"
+  },
+  "runbook": "docs/xp/handoff1b-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "xp-h1a-v1"
+  "tag": "xp-h1b-v1"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "xp-h1a-v1"
+  "phase1": "xp-h1b-v1"
  },
- "total_bytes": 37009529,
+ "total_bytes": 46872635,
  "variant": "plain"
 }

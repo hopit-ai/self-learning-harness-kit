@@ -40,6 +40,17 @@ SERVED_MODEL = "qwen3.5-9b-vllm"
 DECODING = {"official": {"temperature": 0.001, "sampling": {}},
             "sampled": {"temperature": 0.7, "sampling": {"top_p": 0.8}}}
 DEFAULT_DECODING = "sampled"
+# Protocol detail B-P1 (2026-10-19, after hand-off 1a): every request carries
+# max_tokens = min(4096, context_len - prompt_tokens - 2) (1000 when the prompt already
+# fills the context), BFCL's own rule for locally served models (vendored
+# bfcl_eval/model_handler/local_inference/base_oss_handler.py:328-336). context_len is the
+# served --max-model-len (the endpoint's serving_args, else this default); prompt tokens
+# are counted with the pinned 9B tokenizer. Stopping on the cap is an episode result.
+GENERATION = {"max_output_tokens": 4096, "over_context_tokens": 1000, "context_len": 131072,
+              "rule": "min(max_output_tokens, context_len - prompt_tokens - 2); "
+                      "over_context_tokens if context_len < prompt_tokens + 2",
+              "source": "bfcl_eval/model_handler/local_inference/base_oss_handler.py:328-336",
+              "prompt_tokens": "slh.xp.partner.context.body_tokens (pinned 9B tokenizer)"}
 TRIALS_DISCOVERY = 2
 TRIALS_TEST = 4
 FEASIBILITY_ROOTS = 10           # x 2 categories = 20 instances, run first in H1
@@ -126,6 +137,7 @@ def _package(handoff: str, man: dict[str, Any], cells: list[dict[str, Any]],
                  "vendor": {k: v for k, v in vendor.expected().items() if k != "files"},
                  "served_model": SERVED_MODEL, "decoding": {"name": decoding,
                                                             **DECODING[decoding]},
+                 "generation": dict(GENERATION),
                  "code": code_hashes(), "notes": dict(sorted(notes.items())),
                  "cells": cells, **(extra or {})})
 

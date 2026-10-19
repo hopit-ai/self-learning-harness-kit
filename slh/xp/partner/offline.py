@@ -322,6 +322,34 @@ def _locked(lockfile: Path | None) -> dict[str, str]:
     return out
 
 
+def installed_origin(module: str) -> Path | None:
+    """Where ``module`` resolves in this environment from outside the kit directory
+    (its installed binding, ignoring the current directory); None if not installed."""
+    import subprocess
+    import tempfile
+
+    code = ("import importlib.util as u, sys\n"
+            "s = u.find_spec(sys.argv[1])\n"
+            "print(s.origin if s and s.origin else '')")
+    with tempfile.TemporaryDirectory() as cwd:
+        res = subprocess.run([sys.executable, "-I", "-c", code, module], cwd=cwd,
+                             capture_output=True, text=True, check=False)
+    out = res.stdout.strip()
+    return Path(out).resolve() if res.returncode == 0 and out else None
+
+
+def slh_binding_problems(root: Path = pc.REPO) -> list[str]:
+    """An ``slh`` installed in the environment must be this kit's (or absent: the kit
+    runs from its own directory)."""
+    at = installed_origin("slh")
+    kit = (Path(root) / "slh").resolve()
+    if at is None or kit in at.parents:
+        return []
+    return [(f"slh is installed from {at.parent}, not from this kit ({kit}); fix: rerun "
+             "scripts/xp/setup_offline.sh ASSETS_DIR --reuse-env, or "
+             f"{sys.executable} -m pip uninstall -y slh (the kit runs from its directory)")]
+
+
 def check(*, assets: Path | None = None, lockfile: Path | None = None,
           wheelhouse: Path | None = None, root: Path = pc.REPO) -> dict[str, Any]:
     """Everything the run needs, with the network disabled."""
@@ -345,9 +373,15 @@ def check(*, assets: Path | None = None, lockfile: Path | None = None,
                 src = Path(getattr(mod, "__file__", "") or "").resolve()
                 vend = (Path(root) / "vendor/tau2-bench").resolve()
                 if vend not in src.parents:
-                    problems.append(f"tau2 is imported from {src.parent}, not from the kit's "
-                                    "vendor/tau2-bench (pip install --no-deps -e "
-                                    "vendor/tau2-bench)")
+                    problems.append(f"tau2 is imported from {src.parent}, not from this kit's "
+                                    f"{vend} (an environment reused from another kit "
+                                    "checkout keeps that checkout's editable tau2); fix: "
+                                    "rerun scripts/xp/setup_offline.sh ASSETS_DIR "
+                                    "--reuse-env, which rebinds it offline, or run "
+                                    f"{sys.executable} -m pip install --no-index "
+                                    "--find-links .offline/wheelhouse --no-deps -e "
+                                    "vendor/tau2-bench from the kit directory")
+        problems += slh_binding_problems(root)
         if assets is not None:
             problems += asset_problems(Path(assets))
         data = None
