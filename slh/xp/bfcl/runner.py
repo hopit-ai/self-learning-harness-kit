@@ -11,7 +11,11 @@
 the cell's instances on ``--threads`` threads (default 16) through the official BFCL
 driver and loop (``slh.xp.bfcl.handler``). One process per cell is required: the
 official backends keep their state in module globals keyed by model name and entry id.
-Results are appended one line per finished instance; a rerun resumes. A connection,
+Results are appended one line per finished instance; a rerun resumes. **Resume** holds an
+exclusive lock on the cell folder, cuts a torn last line (a cell killed mid-write) after
+copying it to ``results.jsonl.torn``, then appends; a malformed line before the last one
+refuses (exit 4) rather than guessing. ``score`` and ``export`` skip a torn last line and
+refuse the same malformed lines. A connection,
 authentication or model-not-found error halts the cell without a row (``halt.json``,
 exit 3); any other error becomes the official "Error during inference" result (a failed
 episode, as upstream).
@@ -32,7 +36,9 @@ the same command resumes.
 per cell (CPU only). ``export`` writes our trace format (``slh.xp.bfcl.traces``) for
 every cell, plus ``manifest.json`` (plan hash, cells, counts), ``env.json`` and
 ``profile.json`` (tokens, steps, latency, wall time per cell: the throughput profile for
-the GPU-hour estimates).
+the GPU-hour estimates) and, under ``run/``, the run's own records unchanged
+(``identity.json``, ``feasibility-gate.json``, each cell's ``status.json`` / ``halt.json`` /
+torn-tail backup: the recovery evidence of a partial or failed run).
 
 ``--dry-run`` replaces the model with a fixed local fake (it always answers in text, so
 every episode ends without calls and fails); it exercises the official loop, the
@@ -260,16 +266,96 @@ def _append(path: Path, row: dict[str, Any], lock: threading.Lock) -> None:
         os.fsync(f.fileno())
 
 
-def _done(path: Path) -> set[str]:
+class Malformed(Refused):
+    pass
+
+
+def read_results(path: Path) -> tuple[list[dict[str, Any]], bytes]:
+    """The completed rows of ``results.jsonl`` and its torn tail (the bytes after the last
+    newline: an interrupted append; ``b""`` when the file ends with a newline). Every
+    newline-terminated line must be a JSON row with an ``id``; anything else refuses
+    (``Malformed``) instead of guessing which rows are good."""
     if not path.is_file():
-        return set()
-    out = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
+        return [], b""
+    raw = path.read_bytes()
+    cut = raw.rfind(b"\n") + 1
+    rows = []
+    for k, line in enumerate(raw[:cut].split(b"\n")[:-1], start=1):
+        if not line.strip():
+            continue
         try:
-            out.add(json.loads(line)["id"])
-        except (ValueError, KeyError):
-            continue  # a torn last line is rewritten by the rerun
-    return out
+            row = json.loads(line)
+            row["id"]
+        except (ValueError, KeyError, TypeError):
+            raise Malformed(f"{path}: line {k} is not a complete result row (only the last "
+                            "line can be torn); do not edit the file, pack the run folder "
+                            "and tell us") from None
+        rows.append(row)
+    return rows, raw[cut:]
+
+
+def repair_tail(path: Path) -> dict[str, Any] | None:
+    """Make ``results.jsonl`` safe to append to: a torn last line (no newline: the cell
+    was killed mid-write) is copied to ``results.jsonl.torn`` (one backup per repair,
+    numbered) and cut off, so the resumed row starts on its own line; completed rows are
+    kept byte for byte. A last line that is a whole row without its newline gets the
+    newline instead. Malformed non-final lines refuse (``read_results``). Call it with
+    the cell lock held."""
+    tail = read_results(path)[1]
+    if not tail:
+        return None
+    try:
+        row = json.loads(tail)
+        whole = isinstance(row, dict) and "id" in row
+    except ValueError:
+        whole = False
+    if whole:
+        with path.open("ab") as f:
+            f.write(b"\n")
+            f.flush()
+            os.fsync(f.fileno())
+        return {"kept": row["id"], "bytes": len(tail)}
+    k = 0
+    while (backup := path.with_name(path.name + (".torn" if k == 0 else f".torn.{k}"))
+           ).exists():
+        k += 1
+    backup.write_bytes(tail)
+    size = path.stat().st_size
+    with path.open("r+b") as f:
+        f.truncate(size - len(tail))
+        f.flush()
+        os.fsync(f.fileno())
+    return {"cut_bytes": len(tail), "backup": backup.name}
+
+
+def _done(path: Path) -> set[str]:
+    return {r["id"] for r in read_results(path)[0]}
+
+
+class _CellLock:
+    """An exclusive lock on the cell folder for the whole run of the cell: a second
+    process on the same cell (two ``run`` commands on one ``--out``) refuses."""
+
+    def __init__(self, cell_dir: Path) -> None:
+        self.path = cell_dir / ".cell.lock"
+        self.f: Any = None
+
+    def __enter__(self) -> _CellLock:  # noqa: PYI034
+        import fcntl
+
+        self.f = self.path.open("a")
+        try:
+            fcntl.flock(self.f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            self.f.close()
+            raise Refused(f"{self.path.parent} is being run by another process") from None
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        import fcntl
+
+        fcntl.flock(self.f.fileno(), fcntl.LOCK_UN)
+        self.f.close()
 
 
 def _bfcl_env(cell_dir: Path) -> None:
@@ -301,6 +387,19 @@ def run_cell(plan: dict[str, Any], cell_id: str, cell_dir: Path, *, endpoint: di
     h.slh_notes_by_id = {u["instance"]: plan["notes"][u["notes_sha256"]]
                          for u in units if u.get("notes_sha256")}
     results = cell_dir / "results.jsonl"
+    with _CellLock(cell_dir):
+        repaired = repair_tail(results)
+        if repaired:
+            print(json.dumps({"torn_tail": repaired}), file=sys.stderr)
+        return _run_units(cell_id, cell_dir, results, units, h, entries, client,
+                          threads, repaired)
+
+
+def _run_units(cell_id: str, cell_dir: Path, results: Path, units: list[dict[str, Any]],
+               h: Any, entries: dict[str, Any], client: Any, threads: int,
+               repaired: dict[str, Any] | None = None) -> int:
+    from slh.xp.bfcl import handler as H
+
     done = _done(results)
     todo = [u for u in units if u["instance"] not in done]
     lock = threading.Lock()
@@ -326,6 +425,8 @@ def run_cell(plan: dict[str, Any], cell_id: str, cell_dir: Path, *, endpoint: di
             f.result()
     status = {"cell_id": cell_id, "units": len(units), "done": len(_done(results)),
               "wall_s": round(time.time() - t0, 1), "halted": bool(halted)}
+    if repaired:
+        status["torn_tail"] = repaired
     (cell_dir / "status.json").write_text(json.dumps(status, sort_keys=True))
     if halted:
         (cell_dir / "halt.json").write_text(json.dumps({"reason": halted[0]}))
@@ -340,8 +441,7 @@ def score_cell(plan: dict[str, Any], cell_id: str, cell_dir: Path) -> int:
     h = H.build_handler(served_model=plan["served_model"], registry_name=f"slh-{cell_id}",
                         base_url="http://127.0.0.1:9/v1", temperature=0.001,
                         client=FakeClient())
-    rows = [json.loads(line) for line in (cell_dir / "results.jsonl").read_text().splitlines()
-            if line.strip()]
+    rows = read_results(cell_dir / "results.jsonl")[0]  # a torn last line is not a row
     cats = sorted({data.parse_instance(r["id"])[1] for r in rows})
     prompts: dict[str, Any] = {}
     answers: dict[str, Any] = {}
@@ -378,14 +478,7 @@ def episode_profile(rows: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def _rows(path: Path) -> list[dict[str, Any]]:
-    out = []
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                out.append(json.loads(line))
-            except ValueError:
-                continue  # a torn last line
-    return out
+    return read_results(path)[0]
 
 
 def feasibility_gate(plan: dict[str, Any], out: Path, *, smoke: bool) -> dict[str, Any]:
@@ -511,13 +604,16 @@ def read_outcomes(export: Path) -> dict[tuple[str, str], dict[str, Any]]:
 def export(plan: dict[str, Any], run: Path, out: Path, *, cap_bytes: int = EXPORT_CAP_BYTES
            ) -> dict[str, Any]:
     out.mkdir(parents=True, exist_ok=True)
-    counts, profile = {}, {}
+    counts, profile, torn = {}, {}, {}
+    records = _copy_run_records(plan, run, out / "run")
     for cell in plan["cells"]:
         cdir = run / "cells" / cell["cell_id"]
         res = cdir / "results.jsonl"
         if not res.is_file():
             continue
-        rows = [json.loads(line) for line in res.read_text().splitlines() if line.strip()]
+        rows, tail = read_results(res)  # a torn last line (killed mid-write) is no row
+        if tail:
+            torn[cell["cell_id"]] = len(tail)
         verdicts = {}
         if (cdir / "verdicts.jsonl").is_file():
             for line in (cdir / "verdicts.jsonl").read_text().splitlines():
@@ -565,12 +661,42 @@ def export(plan: dict[str, Any], run: Path, out: Path, *, cap_bytes: int = EXPOR
     man = {"schema": "xp-bfcl-export-v1", "plan_sha256": plan["sha256"],
            "handoff": plan["handoff"], "counts": counts,
            "identity": json.loads((run / "identity.json").read_text())
-           if (run / "identity.json").is_file() else None}
+           if (run / "identity.json").is_file() else None,
+           "run_records": records,
+           "halted_cells": sorted(p.parent.name for p in run.glob("cells/*/halt.json")),
+           "torn_tails": torn}
     (out / "manifest.json").write_text(json.dumps(man, indent=1, sort_keys=True))
     size = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
     if size > cap_bytes:
         raise Refused(f"export is {size} bytes, over the cap {cap_bytes}")
     return man
+
+
+RUN_RECORDS = ("status.json", "halt.json")
+
+
+def _copy_run_records(plan: dict[str, Any], run: Path, dest: Path) -> list[str]:
+    """The run's own records, unchanged, under ``EXPORT/run/``: ``identity.json``,
+    ``feasibility-gate.json`` and per cell ``status.json``, ``halt.json`` and any
+    ``results.jsonl.torn*`` backup (also for a cell that halted before its first row), so
+    a partial or failed run comes back with its recovery evidence."""
+    import shutil
+
+    got = []
+    for name in ("identity.json", "feasibility-gate.json"):
+        if (run / name).is_file():
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(run / name, dest / name)
+            got.append(name)
+    for cell in plan["cells"]:
+        cdir = run / "cells" / cell["cell_id"]
+        names = [n for n in RUN_RECORDS if (cdir / n).is_file()]
+        names += sorted(p.name for p in cdir.glob("results.jsonl.torn*"))
+        for n in names:
+            (dest / "cells" / cell["cell_id"]).mkdir(parents=True, exist_ok=True)
+            shutil.copy2(cdir / n, dest / "cells" / cell["cell_id"] / n)
+            got.append(f"cells/{cell['cell_id']}/{n}")
+    return got
 
 
 def _merge_parts(out: Path) -> None:

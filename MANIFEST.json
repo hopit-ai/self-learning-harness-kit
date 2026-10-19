@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "d9ce8aff72c0fe0dabcffac89b8a9728cb1676e0",
-  "tree": "cadd9d3dd5826ea5135bf3151e53dd735f03ab2c"
+  "commit": "45a927fb1bb1b29c92d426e6d57fce5253a4cdbe",
+  "tree": "bf04beeb5f6b1241b723e6bc4636ca98b1a85148"
  },
  "files": {
   ".gitignore": {
@@ -22,12 +22,12 @@
   "README-plain.md": {
    "bytes": 5556,
    "mode": "644",
-   "sha256": "ff2ed1dfa4b80d264d161fd192dd40217d343d16ac6eec3678fb845d2f5d941d"
+   "sha256": "7a60a1f55e17e2e663678bd01ee4ae8ab20cdcbc40fe00e48c3e2b4bfb97e4af"
   },
   "README.md": {
-   "bytes": 2234,
+   "bytes": 2129,
    "mode": "644",
-   "sha256": "3bc27999ba5622bb4e6f6679f08220fc21c8249f28944bda0a21c27cbf6f0abf"
+   "sha256": "1965604c75a31748ccdac0e70bc2c86add5153c75d29ed7b5e64f2906fedad1d"
   },
   "configs/a0-vllm.yaml": {
    "bytes": 1026,
@@ -79,45 +79,20 @@
    "mode": "644",
    "sha256": "e2abb8fb625ceedc34c01548e58a850e892ccc6717970547b8a3665ebc794537"
   },
-  "docs/xp/handoff1b-runbook.md": {
-   "bytes": 9613,
+  "docs/xp/handoff2-bfcl-runbook.md": {
+   "bytes": 10215,
    "mode": "644",
-   "sha256": "3acfb9e06247364c2481836178c9fee7fc8b2701a81d9ac251e5aca1428ca577"
+   "sha256": "bcab283bab7e732ebffa03d20c2792b7ca8d52363f24c7c9dbd0361dd1ef8a1a"
   },
-  "package-h1/README-h1.md": {
-   "bytes": 1191,
+  "package-bfcl-h2/plan.json": {
+   "bytes": 829796,
    "mode": "644",
-   "sha256": "e0c1e5d606244da4882669b1607e1bd323cf84fa03018df198c8837bf2393927"
-  },
-  "package-h1/plan.json": {
-   "bytes": 13216,
-   "mode": "644",
-   "sha256": "22231cd41d296498b7d54c64723aa715f9dfefd140a7d18c0a277cdce7e7a51f"
-  },
-  "package-h1/pool.json": {
-   "bytes": 15419,
-   "mode": "644",
-   "sha256": "efbcc77a855cf1bba23fc17b3f669297607c2f2f415c83d57780c72de6b99381"
-  },
-  "package-h1/prompts.jsonl": {
-   "bytes": 7263850,
-   "mode": "644",
-   "sha256": "58ac6e3a50b4018931cc3fc2dbaeb452ad608de5d9f11777a78a9efc5a3b4178"
-  },
-  "package-h1/questions.jsonl": {
-   "bytes": 29291509,
-   "mode": "644",
-   "sha256": "41da3265efa661c38984e8bb8dd1fe9b5bd51b67470636b18fb52b22dec0678c"
-  },
-  "package-h1/units.jsonl": {
-   "bytes": 8110470,
-   "mode": "644",
-   "sha256": "1511a57ec1a8c1e6ff50cb7b728d6b9efd023cf195fee898cefb58cd78a85658"
+   "sha256": "6a9e92c650e7c515e53acbec05dd441b593af551f983fe07451cc7012b9f1509"
   },
   "pyproject.toml": {
-   "bytes": 1443,
+   "bytes": 1419,
    "mode": "644",
-   "sha256": "be740d4de70d89f08198580ef6f607277c08c16bf51c42f532017af09ae94dc0"
+   "sha256": "cbd63245d518711267dd8d87da606db555c33f32e6c28659b432e15019f27542"
   },
   "scripts/xp/fetch_vendor.sh": {
    "bytes": 1307,
@@ -490,14 +465,14 @@
    "sha256": "910d895daf560423a5ac00f34330f173fd171cf90c9d64d13b489ac9fbc1c623"
   },
   "slh/xp/bfcl/plan.py": {
-   "bytes": 18760,
+   "bytes": 19166,
    "mode": "644",
-   "sha256": "f774dec7dd335b706208bb74a19d1b3d13cf2a63b141133ad730c685dd0efc8b"
+   "sha256": "8b198ce3af9bde1f8a683b06cfeed7985596570b389c28d918981b3f83a83df8"
   },
   "slh/xp/bfcl/runner.py": {
-   "bytes": 32665,
+   "bytes": 37938,
    "mode": "644",
-   "sha256": "88fa6dc76ed34c03909ca973d2b6561909e332e731d5c797102e2fcde9ab0794"
+   "sha256": "30a1a567d5eb7aa2f914753a560092f74d4e4cd915f86ff7d96807be22777d27"
   },
   "slh/xp/bfcl/splits.py": {
    "bytes": 14327,
@@ -518,26 +493,6 @@
    "bytes": 565,
    "mode": "644",
    "sha256": "08bf4d4b6df1886f18c548711d0905ffb3532c6ce2ec3f3a6829cff313d33420"
-  },
-  "slh/xp/fgate/build.py": {
-   "bytes": 10878,
-   "mode": "644",
-   "sha256": "8a4bb9da330312df475ab149a9680bf31eed6a05f7a02a9058190dd4f0786e6d"
-  },
-  "slh/xp/fgate/design.py": {
-   "bytes": 26250,
-   "mode": "644",
-   "sha256": "357f7b669c30fcfe7e90307138c4f43158a572a969ccaf0f4462ff12f88078ec"
-  },
-  "slh/xp/fgate/difficulty_power.py": {
-   "bytes": 6864,
-   "mode": "644",
-   "sha256": "b488c631b65500c9d63f586df858cd43ec2e92b8d330c7456413200fb90691eb"
-  },
-  "slh/xp/fgate/pool.py": {
-   "bytes": 11875,
-   "mode": "644",
-   "sha256": "5d7875583f6bcb85676c3f188d19699f24ae11ab68239e8973230144f342f26d"
   },
   "slh/xp/fgate/units.py": {
    "bytes": 20266,
@@ -649,21 +604,6 @@
    "mode": "644",
    "sha256": "bc93414e42b582d6040005871e59a7b6fe24f09c872a65368fc72fec2a6cc83a"
   },
-  "slh/xp/partner_c/__init__.py": {
-   "bytes": 640,
-   "mode": "644",
-   "sha256": "9ceb4d20f4a50c1adcddb9394ce6704f6ee9a7391dfe09f5cd9d936807a0cacf"
-  },
-  "slh/xp/partner_c/offline_extra.py": {
-   "bytes": 3261,
-   "mode": "644",
-   "sha256": "da7216d674a9d273406f03ad4146377f9a4ddb8148001685c2a2898b2906b834"
-  },
-  "slh/xp/partner_c/train.py": {
-   "bytes": 24093,
-   "mode": "644",
-   "sha256": "088f5657508794e9957da3873068cb7f41f9333457cc3a8638dcaaed8afec8b7"
-  },
   "slh/xp/phase2/__init__.py": {
    "bytes": 26412,
    "mode": "644",
@@ -742,19 +682,11 @@
  },
  "kit_repo": "hopit-ai/self-learning-harness-kit",
  "phase1_package": false,
- "plan_id": "xp-h1b-2026-10-19",
+ "plan_id": "xp-h2b-2026-10-19",
  "plan_sha256": null,
  "registration_sha256": null,
  "release": {
   "assets": {
-   "db-ext-v2.json": {
-    "bytes": 28698817,
-    "sha256": "3d03098276f5b2dd2ec08988f11e4f3d239e7ac0d052991f63807f35760130e5"
-   },
-   "db-ext-v2.sha256": {
-    "bytes": 81,
-    "sha256": "b2992e6ab8518bb55782b6811d0dec7b7be9f739511e5766faecc890f7adf23d"
-   },
    "offline-assets.json": {
     "bytes": 500,
     "sha256": "7cea783c97db18bc98f4693d7c125decbf1d1da84f0233c16bf0e6901e168514"
@@ -763,58 +695,67 @@
     "bytes": 165984479,
     "sha256": "a65736d75b1f5cc712c3e068704c64ca7fd4592d0e7cc94248ef45f1c05afd76"
    },
+   "wheelhouse-bfcl-linux-x86_64-py312.tar.gz": {
+    "bytes": 106569207,
+    "sha256": "5cd8aed9d3c2a9e7d543bbc18f8b6051c7e6edffb8b2a92f3ba5950be8a8f34c"
+   },
+   "wheelhouse-bfcl.sha256": {
+    "bytes": 108,
+    "sha256": "c78e63ccaef9e63566376dfbe8cc3cf1357c77e5e5f4ebd891bcc0e308aaa32d"
+   },
    "wheelhouse-linux-x86_64-py312.tar.gz": {
     "bytes": 67497161,
     "sha256": "d67df2fa5518996ff5a5f74db92f27bfa1b800b73e744421882ced5b5405021e"
    }
   },
-  "handoff": "Hand-off 1b",
+  "handoff": "Hand-off 2 (function-calling benchmark)",
   "kit_repo": "hopit-ai/self-learning-harness-kit",
   "packages": {
-   "package-h1": {
-    "counts": {
-     "collect_units": 1530,
-     "difficulty_units": 1080,
-     "fgate_units": 20400,
-     "lessons": 12,
-     "prompts": 4051,
-     "questions": 3810,
-     "units": 23010
+   "package-bfcl-h2": {
+    "cells": 47,
+    "decoding": {
+     "name": "sampled",
+     "sampling": {
+      "top_p": 0.8
+     },
+     "temperature": 0.7
     },
-    "estimate": {
-     "basis": "1-3 decisions per second per H100 (phase-1 assumption 3/s with prefix caching; lesson-varied system prompts cache less)",
-     "cap_h100_hours": 6.5,
-     "h100_hours": "2.1-6.4",
-     "node_hours_8xh100": "0.27-0.80",
-     "within_cap": true
+    "draws": {
+     "S": 14,
+     "U": 32
     },
-    "plan_sha256": "d5251d7234f556e990e416b5411a310edba424822ea85630a3f64acd43d5c670",
-    "what": "part A: decision screen and proposal collection (F' / C)"
+    "episodes": 2820,
+    "plan_sha256": "c26b6fd8e589d7354e12ac89ef8eebe5f29124c4a6578a47c1ff4f35c334dbd6",
+    "pools": {
+     "S": {
+      "lessons": 4,
+      "sha256": "735bd4d2bc6ffb1028d2fc425984a349ae38c97bab993ffc1b4624204d85a588"
+     },
+     "U": {
+      "lessons": 8,
+      "sha256": "03c07bee06715bda7c826c879b7f940ee3789d15606ed6215bf1511d50e116d7"
+     }
+    },
+    "what": "part D: function-calling benchmark, randomized lesson inclusion on the gate split (empty-library anchors)"
    }
   },
   "part_names": {
-   "A": "decision screen and proposal collection"
+   "D": "function-calling benchmark: randomized lesson inclusion on the gate split"
   },
   "parts": [
-   "A"
+   "D"
   ],
   "phase1_package": false,
   "rehearsal": false,
-  "retail_db": {
-   "domain": "retail-ext-v2",
-   "file": "db-ext-v2.json",
-   "name": "ext-v2",
-   "sha256": "3d03098276f5b2dd2ec08988f11e4f3d239e7ac0d052991f63807f35760130e5"
-  },
-  "runbook": "docs/xp/handoff1b-runbook.md",
+  "runbook": "docs/xp/handoff2-bfcl-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "xp-h1b-v1"
+  "tag": "xp-h2b-v1"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "xp-h1b-v1"
+  "phase1": "xp-h2b-v1"
  },
- "total_bytes": 46872635,
+ "total_bytes": 2929067,
  "variant": "plain"
 }

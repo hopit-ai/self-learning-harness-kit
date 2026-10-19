@@ -223,8 +223,14 @@ def build_h2(man: dict[str, Any], pools: list[dict[str, Any]], *, decoding: str 
                     for u in units if u["draw"] == d]
             cells.append(_cell(f"h2-gate-{p['pool']}-d{d:02d}", f"FPRIME-{p['pool']}", 0,
                                "fprime-draw", rows))
+    # Run order: the anchors first, then the pools' draws interleaved (U d01, S d01, U d02,
+    # ...), so a run stopped at its cap leaves both pools with the same number of draws.
+    draw_cells = [c["cell_id"] for c in cells[1:]]
+    order = [cells[0]["cell_id"]] + sorted(
+        draw_cells, key=lambda c: (int(c.rsplit("-d", 1)[1]), c.split("-")[2] != "U"))
     return _package("h2", man, cells, notes, decoding=decoding,
-                    extra={"pools": {p["pool"]: p for p in pools}, "draws": per_pool})
+                    extra={"pools": {p["pool"]: p for p in pools}, "draws": per_pool,
+                           "order": order})
 
 
 # --------------------------------------------------------------------------- libraries
