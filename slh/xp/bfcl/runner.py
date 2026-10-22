@@ -434,6 +434,46 @@ def _run_units(cell_id: str, cell_dir: Path, results: Path, units: list[dict[str
     return 0
 
 
+def _json_key(k: Any) -> str:
+    """The text ``json`` writes for a mapping key (str, int, float, bool, None)."""
+    if isinstance(k, str):
+        return k
+    if isinstance(k, bool) or k is None:
+        return {True: "true", False: "false", None: "null"}[k]
+    if isinstance(k, int):
+        return int.__repr__(k)
+    if isinstance(k, float):
+        return json.dumps(k)
+    return str(k)  # json itself refuses other key types
+
+
+def presort(obj: Any) -> Any:
+    """``obj`` with every mapping rebuilt in sorted key order: natural order where the keys
+    are mutually orderable (what ``sort_keys`` does), else by the JSON key text, then the
+    key's type name. Nothing is dropped or converted."""
+    if isinstance(obj, dict):
+        keys = list(obj)
+        try:
+            keys = sorted(keys)
+        except TypeError:
+            keys = sorted(keys, key=lambda k: (_json_key(k), type(k).__name__))
+        return {k: presort(obj[k]) for k in keys}
+    if isinstance(obj, (list, tuple)):
+        return [presort(v) for v in obj]
+    return obj
+
+
+def dumps_sorted(obj: Any, **kw: Any) -> str:
+    """``json.dumps(obj, sort_keys=True, **kw)``, or, when that raises ``TypeError`` (a
+    mapping with keys of mixed types, e.g. an official state-mismatch verdict carrying a
+    backend's ``orders`` keyed by int and str ids), the same object in ``presort`` key
+    order. Byte-identical whenever the plain call succeeds (deviation B-D8)."""
+    try:
+        return json.dumps(obj, sort_keys=True, **kw)
+    except TypeError:
+        return json.dumps(presort(obj), sort_keys=False, **kw)
+
+
 def score_cell(plan: dict[str, Any], cell_id: str, cell_dir: Path) -> int:
     from slh.xp.bfcl import handler as H
 
@@ -454,7 +494,7 @@ def score_cell(plan: dict[str, Any], cell_id: str, cell_dir: Path) -> int:
         for r in sorted(rows, key=lambda r: r["id"]):
             v = H.score_entry(h, r, prompts[r["id"]], answers[r["id"]],
                               model_name=h.registry_dir_name)
-            f.write(json.dumps({"id": r["id"], "verdict": v}, sort_keys=True, default=str) + "\n")
+            f.write(dumps_sorted({"id": r["id"], "verdict": v}, default=str) + "\n")
     return 0
 
 

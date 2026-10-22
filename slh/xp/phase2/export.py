@@ -14,6 +14,12 @@ fields. Files::
     blobs.jsonl.gz                     every system prompt and tool list a row names
     run.jsonl.gz                       identity, arm prompts, job plan, env, halts,
                                        spend summary, worker statuses
+    openings.jsonl.gz                  (pinned-opening runs only) the stored simulator
+                                       openings and which job generated / replayed each
+    consent-verdicts.jsonl.gz          (consent-chain runs only) every public verdict row
+                                       of the step-4 guard chain, all attempts; each
+                                       conversation row also carries its own
+                                       (``consent_verdicts``)
     manifest.json                      sha256, bytes and rows of every file
 
 Bytes are a pure function of the run directory (sorted rows, canonical JSON,
@@ -31,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from slh.xp.partner import common as pc
+from slh.xp.phase2 import openings as OP
 from slh.xp.phase2 import run as R
 
 EXPORT_SCHEMA = "xp-phase2-export-v1"
@@ -88,6 +95,8 @@ def conversation_rows(run: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
                "attempts": res["attempts"], "history": history.get(job.key, []),
                "valid": res["final"]["valid"], "worker": res["final"]["worker"],
                **{k: ep[k] for k in EPISODE_FIELDS if k in ep}}
+        if "consent_verdicts" in res["final"]:  # consent-chain runs only
+            row["consent_verdicts"] = res["final"]["consent_verdicts"]
         if row.get("seed") != job.seed:
             raise ExportRefused(f"{job.key}: recorded seed {row.get('seed')} is not the "
                                 f"planned {job.seed}")
@@ -166,6 +175,22 @@ def export(run: Path, out: Path, *, shard_bytes: int = DEFAULT_SHARD_BYTES) -> d
         blobs[f"conversations-{i:05d}.jsonl.gz"] = part
     blobs["blobs.jsonl.gz"] = _gz(_blobs(run, rows))
     blobs["run.jsonl.gz"] = _gz(_run_rows(run, meta))
+    if meta["identity"].get("opening_pin"):
+        # Pinned simulator openings (slh.xp.phase2.openings): cache entries and uses.
+        rows_o = OP.export_rows(run)
+        for i, o in enumerate(rows_o):
+            pc.assert_no_gold(o, f"openings[{i}]")
+        blobs[OP.EXPORT_FILE] = _gz(rows_o)
+    if meta["identity"].get("consent_chain"):
+        # stable sort: rows of one attempt keep their logged order
+        rows_v = sorted(R.consent_verdicts(run), key=lambda v: (
+            str(v.get("key")), str(v.get("worker")), str(v.get("attempt_log"))))
+        for i, v in enumerate(rows_v):
+            pc.assert_no_gold(v, f"consent_verdicts[{i}]")
+            hit = _forbidden(v)
+            if hit:
+                raise ExportRefused(f"consent_verdicts[{i}]: grading field {hit}")
+        blobs[R.CONSENT_EXPORT] = _gz(rows_v)
     for name, (data, _) in blobs.items():
         if len(data) > shard_bytes:
             raise ExportRefused(f"{name} is {len(data)} bytes, above the shard cap")

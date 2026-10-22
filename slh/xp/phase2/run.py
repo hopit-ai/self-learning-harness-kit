@@ -32,6 +32,34 @@ same in every arm of a block (paired). Arm states come from the package's
 bundles (``slh.xp.phase2.bundles``): B1 is the empty state; the other arms
 load their run's notes, bound to this run's base arm.
 
+Pinned openings (pairing fix, 2026-10-19; ``slh.xp.phase2.openings``,
+docs/xp/pairing-fix.md). With ``pin_openings`` on, the simulator's first reply of a
+(scenario, seed) is generated once, stored content-addressed under ``openings/`` and
+replayed byte-identically to every arm of the block and every rerun; later turns stay
+live. Default ``auto``: ON for a new run directory, and whatever the stored identity
+records for an existing one (absent = off), so registered runs resume unchanged.
+Recorded in the run identity (``opening_pin``) when on.
+
+Consent guard chain (track C step 4; ``slh.guards.consent``, docs/xp/step4-plan.md
+§4). With ``consent_chain`` (a JSON file ``{"arms": {"<arm name>": {"mode": ...,
+"checker": {...}}}}``), the named arms run identity guard v2.1 and then the consent
+check on every proposed write (mode ``N`` shadow, ``R`` rule, ``C-S1`` trained checker,
+``C-P9`` prompted 9B; one retry, fail-closed). Selected by ARM NAME, like G1's
+``b1_guard``; an arm cannot also be named in ``identity_guard`` (the chain already
+includes that guard). Recorded in the run identity (``consent_chain``: the chain's
+descriptor with each arm's config, no secrets); absent = off (default), so runs without
+it keep their identity. Every checked write gives one verdict row: raw rows go to
+``private/workers/<w>/verdicts/``; the public form (checker errors reduced to type and
+hash) goes to ``<worker dir>/consent-verdicts.jsonl`` with the job key and execution
+id, is attached to the run records (``consent_verdicts``) and exported. Every checker
+request goes through the worker's meter (``metered_checker_post``: shared ledger and
+halt latch, conversation deadline, serving window, no meter retries; checkers are
+self-hosted, $0 per token in prices.yaml); a dry run answers it with an offline stand-in
+(``dry_checker_post``) through the same metered path and reports the checker load
+(``checker_load``). Smoke and full (and every resume) check that every checker endpoint
+serves its model and reproduces the registered artifact (tokenizer probe and canary
+outputs, ``consent.verify_served``) before the first conversation.
+
 Resume by identity. Every conversation is written by the existing episode loop
 (``slh.runner._run_pairs``: leak checks on every record, metered calls,
 serving-window gate) into the worker's own directory,
@@ -63,6 +91,7 @@ import argparse
 import contextlib
 import dataclasses
 import hashlib
+import importlib
 import json
 import math
 import multiprocessing
@@ -82,7 +111,19 @@ import yaml
 from slh.xp import phase2 as P
 from slh.xp.partner import common as pc
 from slh.xp.phase2 import bundles as B
+from slh.xp.phase2 import openings as OP
 from slh.xp.phase2 import package as PK
+
+
+def _consent() -> Any:
+    """``slh.guards.consent``, imported by name: the chain is our-side step-4 code, so
+    the partner kit's static import closure (``partner.snapshot``) must not pull it
+    (and ``slh.analysis``) in through this runner. A chain run needs the module."""
+    return importlib.import_module("slh.guards.consent")
+
+
+CONSENT_VERDICTS = "consent-verdicts.jsonl"  # per worker dir: public verdict rows
+CONSENT_EXPORT = "consent-verdicts.jsonl.gz"
 
 RUN_SCHEMA = "xp-phase2-run-v1"
 DOMAIN = "retail"
@@ -384,10 +425,13 @@ def _user_section(part: dict[str, Any], root: Path) -> dict[str, Any]:
 
 
 def config_files(ep: dict[str, Any], *, plan: P.Phase2Plan, cap_usd: float,
-                 root: Path = pc.REPO) -> dict[str, str]:
+                 root: Path = pc.REPO, checkers: list[Any] | None = None) -> dict[str, str]:
     """The run's config files (name -> text): run.yaml, agent.yaml, user.yaml,
     prices.yaml. Every served model's price is resolved explicitly
-    (``resolve_prices``): $0 per token only for a model declared ``self_hosted``."""
+    (``resolve_prices``): $0 per token only for a model declared ``self_hosted``.
+    ``checkers`` (consent-chain runs only; absent = files as before): the consent
+    checkers' served models, self-hosted ($0 per token), so their requests are metered
+    and ledgered like every other call."""
     from slh.arms.think import THINK_GIVE_UP_TEXT, THINK_INSTRUCTION
 
     agent, user = _agent_section(ep["agent"], root), _user_section(ep["user"], root)
@@ -398,6 +442,10 @@ def config_files(ep: dict[str, Any], *, plan: P.Phase2Plan, cap_usd: float,
             continue
         prices["models"][section["model"]] = resolve_prices(prices["models"], role,
                                                             ep[role], section)
+    for spec in checkers or []:
+        prices["models"][spec.model] = resolve_prices(
+            prices["models"], f"consent checker {spec.model!r}", {"self_hosted": True},
+            {"model": spec.model})
     run = {"agent": "agent.yaml", "user": "user.yaml", "arm": "think",
            "think_instruction": THINK_INSTRUCTION, "think_cap_message": THINK_GIVE_UP_TEXT,
            "budget": {"cap_usd": float(cap_usd)}, "prices": "prices.yaml", "seed": 300,
@@ -489,8 +537,15 @@ def _worker_dirs(out: Path) -> list[Path]:
 def records(out: Path) -> list[dict[str, Any]]:
     """Every finished conversation record (episode and outcome lines both present),
     oldest session first. ``halted``: written while the run halted on a systematic
-    error (not an attempt)."""
+    error (not an attempt). Runs with the consent chain (``consent_chain`` in the
+    identity) also carry ``consent_verdicts``: the public verdict rows of that
+    conversation (matched by execution id; empty when it checked no write)."""
     rows = []
+    verdicts = consent_verdicts(Path(out)) if _has_chain(Path(out)) else None
+    by_exec: dict[str, list[dict[str, Any]]] = {}
+    for v in verdicts or []:
+        if v.get("execution_id"):
+            by_exec.setdefault(v["execution_id"], []).append(v)
     for wdir in _worker_dirs(Path(out)):
         halted = {h["execution_id"] for h in _jsonl(wdir / "halts.jsonl")
                   if h.get("execution_id")}
@@ -509,7 +564,167 @@ def records(out: Path) -> list[dict[str, Any]]:
                                        and ep.get("termination_reason")
                                        not in INVALID_TERMINATIONS),
                              "halted": ep.get("execution_id") in halted})
+                if verdicts is not None:
+                    rows[-1]["consent_verdicts"] = by_exec.get(ep.get("execution_id"), [])
     return rows
+
+
+def stand_in_ids(text: str) -> list[int]:
+    """The offline stand-in's tokenizer: one id per character (decodable)."""
+    return [ord(ch) for ch in text]
+
+
+def checker_stand_in(decide: Any) -> Any:
+    """An offline consent-checker transport (``slh.guards.consent.Post``) answering
+    every endpoint form the chain uses (``/tokenize`` and the trained checker's batched
+    scoring on ``/completions``; the prompted checker on ``/chat/completions``) with
+    ``decide(text) -> (consent, target)``, where ``text`` is the checker input (as the
+    registered procedure truncates it). Nothing is sent. The chain module is imported
+    only when a request comes (a kit without it imports this runner fine)."""
+
+    def post(url: str, body: dict[str, Any], headers: dict[str, str], timeout: float
+             ) -> dict[str, Any]:
+        if url.endswith("/chat/completions"):
+            consent, target = decide(body["messages"][-1]["content"])
+            return {"choices": [{"message": {"content": json.dumps(
+                {"consent": consent, "target": target})}}]}
+        if url.endswith("/tokenize"):
+            return {"tokens": stand_in_ids(body["prompt"])}
+        CG = _consent()
+        class_text = importlib.import_module("slh.xp.partner_c.train").class_text
+        choices = []
+        decided: dict[str, tuple[str, str]] = {}  # one verdict per scored prompt
+        for i, ids in enumerate(body["prompt"]):
+            text = "".join(map(chr, ids))
+            cls = next(c for c in CG.CLASSES if text.endswith(class_text(*c)))
+            start = len(ids) - len(class_text(*cls))
+            if text[:start] not in decided:
+                decided[text[:start]] = tuple(decide(text[:start]))
+            chosen = decided[text[:start]]
+            tail = [0.0 if cls == chosen else -10.0] + [0.0] * (len(ids) - start - 1)
+            choices.append({"index": i, "logprobs": {
+                "token_logprobs": [None] + [0.0] * (start - 1) + tail + [-9.0]}})
+        return {"choices": choices}
+
+    return post
+
+
+def _dry_decide(_text: str) -> tuple[str, str]:
+    return "absent", "correct"  # conservative: the stand-in never approves
+
+
+# A dry run never reaches a checker server: the checked writes the chain routes to the
+# checker get this stand-in's verdict (tests replace it with their own). It still goes
+# through the run's metered transport (``metered_checker_post``), so a dry run counts
+# the checker requests, reserves them in the ledger and obeys the deadline.
+dry_checker_post = checker_stand_in(_dry_decide)
+
+
+def checker_passthrough() -> tuple[type[BaseException], ...]:
+    """Exceptions from the metered checker transport that end the conversation (as
+    for any agent or simulator call), not a fail-closed block: the conversation's
+    deadline, a budget refusal or halt (incl. a closed serving window), an overspend."""
+    from slh.budget import BudgetExceeded, Overspend
+
+    return (ConversationTimeLimit, RepeatedTimeout, BudgetExceeded, Overspend)
+
+
+def metered_checker_post(meter: Any, transport: Any, gate: Any = None) -> Any:
+    """The consent checker's transport inside a phase-2 worker: every checker request
+    (tokenize, scoring, chat) is one ``meter.call`` (role ``judge``) on the run's meter,
+    so it is reserved in and settled to the shared ledger (the cross-worker cap and the
+    halt latch apply), refused once the conversation's deadline has passed (the meter is
+    deadline-bound, ``bind_deadline``), sent with the network timeout
+    ``min(ATTEMPT_TIMEOUT_S, remaining conversation time, the decision's remaining
+    budget)``, never retried by the meter (a checker failure fails closed), refused
+    after the agent's serving window closed (``gate.check_request``), and recorded by
+    the call recorder. Checkers are self-hosted: $0 per token (prices.yaml), so the
+    ledger records them at $0 while the meter tallies their calls and tokens."""
+    from slh import budget
+    from slh.budget import ModelConfig, usage_from_response
+
+    configs: dict[tuple[str, str, Any], Any] = {}
+
+    def post(url: str, body: dict[str, Any], headers: dict[str, str], timeout: float
+             ) -> dict[str, Any]:
+        key = (url, str(body.get("model")), body.get("max_tokens"))
+        if key not in configs:
+            configs[key] = ModelConfig(
+                backend="openai_compatible", model=str(body.get("model")), api_base=url,
+                temperature=0.0, max_tokens=body.get("max_tokens"), retries=0,
+                reasoning_reserve_tokens=0)
+        if gate is not None:
+            gate.check_request()  # ServingWindowClosed (a BudgetExceeded) ends it
+
+        def invoke() -> tuple[Any, Any]:
+            # Wire capture as for every other metered call: the attempt is marked
+            # dispatched (after a last halt check), the response's usage, provider-
+            # reported cost and raw fields are recorded the moment it returns (so a
+            # nonzero reported cost is charged and checked against the $0 reservation
+            # and the cap: Overspend + halt), with the wire latency.
+            attempt = budget._attempt.get()
+            wire_timeout = attempt_timeout(timeout)
+            if attempt is not None and attempt.ledger is not None:
+                try:
+                    attempt.ledger.assert_not_halted()
+                except budget.BudgetExceeded:
+                    attempt.rejected = True
+                    raise
+            if attempt is not None:
+                attempt.dispatched = True
+            started = time.perf_counter()
+            try:
+                response = transport(url, body, headers, wire_timeout)
+            except Exception as exc:
+                # A transport failure once the conversation's time is up is the
+                # deadline (ends the conversation), never a fail-closed block.
+                rem = deadline_remaining()
+                if rem is not None and rem <= 0:
+                    raise _expired("during a consent-checker request") from exc
+                raise
+            finally:
+                if attempt is not None:
+                    attempt.wire_latency_s = time.perf_counter() - started
+            if attempt is not None:
+                attempt.record(budget.usage_from_response(response),
+                               budget.reported_cost_from_response(response))
+                attempt.raw.append(budget.raw_response_record(response))
+            rem = deadline_remaining()
+            if rem is not None and rem <= 0:  # answered too late: not accepted
+                raise _expired("after a consent-checker request")
+            return response, usage_from_response(response)
+
+        return meter.call("judge", configs[key], body, invoke)
+
+    return post
+
+
+def _has_chain(out: Path) -> bool:
+    path = Path(out) / "identity.json"
+    return path.is_file() and bool(pc.read_json(path).get("consent_chain"))
+
+
+def consent_verdicts(out: Path) -> list[dict[str, Any]]:
+    """Every public consent-verdict row of the run (all attempts), in worker order."""
+    rows = []
+    for wdir in _worker_dirs(Path(out)):
+        for v in _jsonl(wdir / CONSENT_VERDICTS):
+            rows.append({**v, "worker": wdir.name})
+    return rows
+
+
+def public_verdict(row: dict[str, Any], **meta: Any) -> dict[str, Any]:
+    """A raw verdict row (``slh.guards.consent``) in its public form: a checker error
+    becomes type + message hash (never provider text); the rest is ours (rule labels,
+    route, decision) or agent-visible (tool, arguments)."""
+    out = {**meta, **row}
+    err = row.get("error")
+    if err:
+        kind, _, msg = str(err).partition(": ")
+        if not (msg and re.fullmatch(r"[A-Za-z_][\w.]{0,79}", kind)):
+            kind, msg = "CheckerError", str(err)
+        out["error"] = public_error(kind, msg)
+    return redact_public(out)
 
 
 def resolve(jobs: list[Job], rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -896,9 +1111,8 @@ def install_deadline() -> None:
     finds, so the guard's wire checks stay outermost)."""
     if _DEADLINE_INSTALLED:
         return
-    from slh import openai_compat as oc
-
     from slh import budget, ledger
+    from slh import openai_compat as oc
 
     _DEADLINE_INSTALLED["post_json"] = oc.post_json
     oc.post_json = _wrap_post_json(oc.post_json)
@@ -923,9 +1137,8 @@ def uninstall_deadline() -> None:
     """Tests: restore the original attributes."""
     if not _DEADLINE_INSTALLED:
         return
-    from slh import openai_compat as oc
-
     from slh import budget, ledger
+    from slh import openai_compat as oc
 
     oc.post_json = _DEADLINE_INSTALLED.pop("post_json")
     budget._sleep = _DEADLINE_INSTALLED.pop("budget._sleep")
@@ -1048,6 +1261,15 @@ def _worker_main(out_str: str, package_str: str, session: int, index: int,
         from slh.guards import identity as IG
 
         IG.install()  # composition: rebinds slh.runner.build_guards in this process
+    # Consent guard chain (step 4), also selected by arm name; installed after the
+    # identity guard so its wrapper is outermost (it rebuilds IG + consent for its arms).
+    chain = identity.get("consent_chain")
+    if chain:
+        CG = _consent()
+        CG.install()
+    verdict_dir = pdir / "verdicts"
+    verdict_seq = 0
+    openings = OP.OpeningCache(out / OP.DIRNAME) if identity.get("opening_pin") else None
     package = PK.Package(Path(package_str), check_code=False)  # coordinator checked the code
     if package.registration_sha256 != identity["package_registration_sha256"]:
         raise SystemExit(EXIT_REFUSED)
@@ -1064,6 +1286,14 @@ def _worker_main(out_str: str, package_str: str, session: int, index: int,
     # network timeout (the deadline section above); installed before the episode loop.
     install_deadline()
     bind_deadline(meter)
+    # Consent checker requests go through this worker's meter (ledger, deadline, serving
+    # window; ``metered_checker_post``); a dry run answers them with the offline stand-in.
+    checker_post = checker_passthrough_types = None
+    if chain:
+        checker_post = metered_checker_post(
+            meter, dry_checker_post if identity.get("mode") == "dry" else CG.http_post,
+            gate=runner.gate_for(config.agent))
+        checker_passthrough_types = checker_passthrough()
     limit_s = float(config.timeout_s) if config.timeout_s is not None else None
     recorder = CallRecorder(wdir / "calls.jsonl", pdir / "calls.jsonl", session=session,
                             worker=wid)
@@ -1110,10 +1340,24 @@ def _worker_main(out_str: str, package_str: str, session: int, index: int,
                 private_blobs=runner.BlobStore(runner.private_dir(out) / "blobs"))
         sink = sinks[job.arm]
         box: dict[str, Any] = {}
+
+        def log_opening(row: dict[str, Any]) -> None:
+            pc.append_jsonl(wdir / OP.USES, [row])
+
+        verdict_log = None
+        if chain:
+            verdict_seq += 1
+            verdict_log = verdict_dir / f"{verdict_seq:05d}.jsonl"  # raw, one per attempt
         try:
             with conversation_deadline(limit_s), (
                     IG.active(job.arm in guard_arms) if guard_arms
-                    else contextlib.nullcontext()):
+                    else contextlib.nullcontext()), (
+                    CG.worker_context(identity, job.arm, log_path=verdict_log,
+                                      post=checker_post,
+                                      passthrough=checker_passthrough_types) if chain
+                    else contextlib.nullcontext()), (
+                    OP.active(openings, job.as_dict() | {"key": job.key}, log_opening)
+                    if openings is not None else contextlib.nullcontext()):
                 result, reason = runner._run_pairs(
                     domain, config, state, [(job.run, job.seed, tasks[job.scenario_id])],
                     meter, sink, recorder, set(),
@@ -1129,6 +1373,12 @@ def _worker_main(out_str: str, package_str: str, session: int, index: int,
             status["written"] += 1
             last = _jsonl(sink.episodes)
             execution_id = last[-1].get("execution_id") if last else None
+        if verdict_log is not None and verdict_log.is_file():
+            pc.append_jsonl(wdir / CONSENT_VERDICTS, [
+                public_verdict(v, key=job.key, scenario_id=job.scenario_id, run=job.run,
+                               session=session, attempt_log=verdict_log.name,
+                               execution_id=execution_id)
+                for v in _jsonl(verdict_log)])
         if outcome is not None and not outcome.get("valid"):
             status["invalid"] += 1
             eid = runner.episode_id_for(job.scenario_id, job.run)
@@ -1470,7 +1720,9 @@ def _amended_package(package: Path, amended: dict[str, Any], root: Path) -> Any:
 def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
             cap_usd: float = 0.0, root: Path = pc.REPO, check_code: bool = True,
             write: bool = True, identity_guard: Any = None,
-            code_amendments: Path | None = None) -> dict[str, Any]:
+            code_amendments: Path | None = None,
+            pin_openings: bool | str | None = "auto",
+            consent_chain: Any = None) -> dict[str, Any]:
     """Every check that needs no server: package, code, benchmark data, endpoint,
     arm prompts, job plan; and (``write``) the run directory's identity. Raises
     Refused on any mismatch.
@@ -1481,6 +1733,17 @@ def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
     the identity gains ``identity_guard`` (the guard's descriptor); when off the
     identity is exactly as before, so a run directory is never resumed under the
     other setting.
+
+    ``pin_openings``: ``True``/``"on"`` replays one simulator opening per (scenario,
+    seed) to every arm (``slh.xp.phase2.openings``); ``False``/``"off"`` keeps every
+    simulator turn live; ``"auto"``/None (default) is ON for a new run directory and
+    follows the stored identity of an existing one (or of the run named by
+    ``code_amendments``), where its absence means off. Recorded as ``opening_pin``.
+
+    ``consent_chain``: a chain config file (``slh.guards.consent.load_arms``) or an
+    ``{arm name: ChainConfig}`` mapping; the named arms (all in the plan, none also in
+    ``identity_guard``) run the step-4 guard chain. Recorded as ``consent_chain``
+    (``consent.descriptor``); None/empty (default) = off, identity as before.
 
     Code amendments (``code_amendment``): when ``<out>/amendments.jsonl`` (or that of
     ``code_amendments``, the run whose amendments govern a throwaway rehearsal
@@ -1518,7 +1781,11 @@ def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
         if smoke_test_overlap(pkg):
             raise Refused("a smoke job runs a test scenario under another id (same "
                           "instructions)")
-    files = config_files(endpoint, plan=pkg.plan, cap_usd=cap_usd, root=root)
+    chain_arms = consent_arms(consent_chain, sorted({j.arm for j in jobs}))
+    checkers = [c.checker for _, c in sorted((chain_arms or {}).items())
+                if c.checker is not None]
+    files = config_files(endpoint, plan=pkg.plan, cap_usd=cap_usd, root=root,
+                         checkers=checkers or None)
     out = Path(out)
     if write:
         out.mkdir(parents=True, exist_ok=True)
@@ -1546,6 +1813,8 @@ def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
                     "attempt_timeout_s": ATTEMPT_TIMEOUT_S,
                     "max_sends_after_timeout": MAX_SENDS_AFTER_TIMEOUT,
                     "invalid_terminations": list(INVALID_TERMINATIONS)}}
+    if resolve_pin_openings(pin_openings, Path(code_amendments or out)):
+        identity["opening_pin"] = OP.descriptor()
     if identity_guard:
         from slh.guards import identity as IG
 
@@ -1554,6 +1823,13 @@ def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
         if bad:
             raise Refused(f"identity guard: arm(s) {bad} not in this plan ({names})")
         identity["identity_guard"] = IG.descriptor(identity_guard)
+    if chain_arms:
+        CG = _consent()
+        both = sorted(set(chain_arms) & set(identity_guard or ()))
+        if both:
+            raise Refused(f"consent chain: arm(s) {both} also named for the identity guard "
+                          "(the chain already runs it first)")
+        identity["consent_chain"] = CG.descriptor(chain_arms)
     if write:
         path = out / "identity.json"
         if path.is_file():
@@ -1573,6 +1849,88 @@ def prepare(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
                                                      for b in blocks]})
     return {"package": pkg, "config": config, "blocks": blocks, "jobs": jobs,
             "identity": identity, "prompts": prompts, "files": files}
+
+
+def consent_arms(value: Any, names: list[str]) -> dict[str, Any] | None:
+    """``prepare``'s ``consent_chain`` -> {arm: ChainConfig} (None = off); Refused on
+    an invalid config or an arm outside the plan."""
+    if not value:
+        return None
+    CG = _consent()
+    try:
+        if isinstance(value, (str, Path)):
+            arms = CG.parse_arms(names, value)
+        else:
+            arms = dict(value)
+            bad = sorted(set(arms) - set(names))
+            if bad:
+                raise ValueError(f"consent chain: unknown arm(s) {bad}; choose from {names}")
+            for arm, cfg in arms.items():
+                if cfg.problems():
+                    raise ValueError(f"consent chain: {arm}: " + "; ".join(cfg.problems()))
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        raise Refused(str(exc)) from None
+    return arms or None
+
+
+def checker_specs(identity: dict[str, Any]) -> dict[str, Any]:
+    """{arm: CheckerSpec} of the arms whose recorded chain calls a checker. Without a
+    chain nothing is imported (partner kits do not ship ``slh.guards.consent``)."""
+    chain = identity.get("consent_chain")
+    if not chain:
+        return {}
+    CG = _consent()
+    out = {}
+    for arm in sorted((chain or {}).get("arms") or {}):
+        cfg = CG.config_for_arm(chain, arm)
+        if cfg is not None and cfg.checker is not None:
+            out[arm] = cfg.checker
+    return out
+
+
+def check_checkers(identity: dict[str, Any], *, log: Any = None) -> list[str]:
+    """Every consent-checker endpoint answers and serves its configured model (GET
+    /models; nothing generated). Sanitized problems; raw errors to ``log``."""
+    out = []
+    for arm, spec in checker_specs(identity).items():
+        got = probe_models(spec.base_url, spec.api_key_env)
+        _log_raw(log, f"checker:{arm}", "models", got)
+        if "error" in got:
+            out.append(f"consent checker of {arm} at {spec.base_url} does not answer "
+                       f"({got['error']})")
+        elif spec.model not in got["models"]:
+            out.append(f"consent checker of {arm} serves {got['models']}, not {spec.model!r}")
+        else:
+            bad = verify_checker(spec)
+            if log is not None and bad:
+                log({"role": f"checker:{arm}", "step": "canary", "problems": bad,
+                     "time_epoch": time.time()})
+            out += [f"consent checker of {arm}: {p}" for p in bad]
+    return out
+
+
+def verify_checker(spec: Any, post: Any = None) -> list[str]:
+    """The served checker is the registered artifact (``consent.verify_served``:
+    tokenizer-probe digest and canary outputs). Self-hosted, a few requests, $0."""
+    return _consent().verify_served(spec, post=post)
+
+
+def resolve_pin_openings(value: bool | str | None, run_dir: Path) -> bool:
+    """``auto``: on for a new run directory; an existing one keeps what its identity
+    records (no ``opening_pin`` = off: runs registered before the fix are unaffected)."""
+    if isinstance(value, bool):
+        return value
+    value = (value or "auto").strip().lower()
+    if value in ("on", "true", "1", "yes"):
+        return True
+    if value in ("off", "false", "0", "no"):
+        return False
+    if value != "auto":
+        raise Refused(f"pin_openings: {value!r} is not on, off or auto")
+    path = Path(run_dir) / "identity.json"
+    if path.is_file():
+        return bool(pc.read_json(path).get("opening_pin"))
+    return True
 
 
 def _assign(blocks: list[list[Job]], pending: set[str], workers: int) -> list[list[Job]]:
@@ -1821,6 +2179,8 @@ def execute(prep: dict[str, Any], out: Path, *, package: Path, workers: int,
                        out / "ledger.jsonl", config.cap_usd, owner="status",
                        session=_session(out), create=False).snapshot(),
                    "time_epoch": time.time()}
+        if prep["identity"].get("consent_chain"):
+            summary["consent_checker"] = checker_load(out)
         pc.write_json(out / "status.json", summary)
         if halt is not None:
             pc.write_json(out / "halt.json", halt)
@@ -1844,21 +2204,34 @@ def run(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
         cap_usd: float = 0.0, workers: int | None = None, root: Path = pc.REPO,
         check_code: bool = True, worker_init: Any = None, export: bool | None = None,
         in_process: bool | None = None, identity_guard: Any = None,
-        code_amendments: Path | None = None) -> dict[str, Any]:
+        code_amendments: Path | None = None,
+        pin_openings: bool | str | None = "auto",
+        consent_chain: Any = None) -> dict[str, Any]:
     """Prepare (all checks), check the servers, run the pending jobs, export when
-    complete (dry-run: always). ``code_amendments``: see ``prepare``."""
+    complete (dry-run: always). ``code_amendments``, ``consent_chain``: see
+    ``prepare``."""
     from slh.runner import load_config
 
     if mode == "dry":
         endpoint = stub_endpoint(min(2, int(endpoint.get("workers", 2))))
     prep = prepare(package, out, mode=mode, endpoint=endpoint, cap_usd=cap_usd, root=root,
                    check_code=check_code, identity_guard=identity_guard,
-                   code_amendments=code_amendments)
+                   code_amendments=code_amendments, pin_openings=pin_openings,
+                   consent_chain=consent_chain)
     config = load_config(Path(out) / "config" / "run.yaml")
     missing = [k for k in required_keys(config) if not os.environ.get(k)]
+    if mode != "dry":  # a dry run answers the checker offline
+        missing += sorted({s.api_key_env for s in checker_specs(prep["identity"]).values()
+                           if s.api_key_env and not os.environ.get(s.api_key_env)})
     if missing:
         raise Refused(f"missing environment variable(s) {missing} (names only; nothing sent)")
     _check_accounting(Path(out))  # before any probe could open a fresh ledger
+    if prep["identity"].get("opening_pin"):
+        # Every opening an arm used must still be stored and verify; a lost one is never
+        # regenerated (the other arms of its pair already got it).
+        bad = OP.verify_store(Path(out))
+        if bad:
+            raise Refused("pinned openings: " + "; ".join(bad[:5]))
     if mode != "dry":
         def log(record: dict[str, Any]) -> None:
             from slh.runner import private_dir
@@ -1873,6 +2246,10 @@ def run(package: Path, out: Path, *, mode: str, endpoint: dict[str, Any],
                               log=log)
         if problems:
             raise halt(out, {"label": "servers_chat", "detail": "; ".join(problems),
+                             "time_epoch": time.time()})
+        problems = check_checkers(prep["identity"], log=log)
+        if problems:
+            raise halt(out, {"label": "consent_checker", "detail": "; ".join(problems),
                              "time_epoch": time.time()})
     pc.append_jsonl(Path(out) / "logs" / "env.jsonl", [env_report(endpoint, mode=mode)])
     from slh.runner import ServingSpecMismatch
@@ -1907,8 +2284,39 @@ def status(out: Path) -> dict[str, Any]:
     resolved = resolve(flat(blocks), records(Path(out)))
     halt = pc.read_json(Path(out) / "halt.json") if (Path(out) / "halt.json").is_file() \
         else None
-    return {"mode": identity["mode"], "plan_id": identity["plan_id"],
+    out_ = {"mode": identity["mode"], "plan_id": identity["plan_id"],
             "coverage": coverage(resolved), "halt": halt}
+    if identity.get("opening_pin"):
+        out_["pinned_openings"] = len(OP.OpeningCache(Path(out) / OP.DIRNAME).entries())
+    if identity.get("consent_chain"):
+        counts: dict[str, dict[str, int]] = {}
+        for v in consent_verdicts(Path(out)):
+            arm = counts.setdefault(str(v.get("arm")), {})
+            arm[v.get("reason_code") or "?"] = arm.get(v.get("reason_code") or "?", 0) + 1
+        out_["consent_verdicts"] = counts
+        out_["consent_checker"] = checker_load(Path(out))
+    return out_
+
+
+def checker_load(out: Path) -> dict[str, Any]:
+    """Checker load per arm from the verdict rows (all attempts): decisions routed to
+    the checker, requests sent, and both per conversation attempt. A dry run measures
+    the request count of the chain's actual routing (the stand-in answers), so the
+    runtime estimate is conversations x requests per conversation x request latency;
+    the requests are also in the ledger and the call log (role ``judge``)."""
+    by: dict[str, dict[str, Any]] = {}
+    for v in consent_verdicts(Path(out)):
+        a = by.setdefault(str(v.get("arm")), {"decisions": 0, "requests": 0,
+                                              "attempts": set()})
+        a["attempts"].add((v.get("worker"), v.get("attempt_log")))
+        if v.get("route") in ("residual", "uncertain") and v.get("mode") in ("C-S1", "C-P9"):
+            a["decisions"] += 1
+        a["requests"] += int(v.get("checker_requests") or 0)
+    return {arm: {"decisions": a["decisions"], "requests": a["requests"],
+                  "conversations_with_writes": len(a["attempts"]),
+                  "requests_per_conversation": (round(a["requests"] / len(a["attempts"]), 3)
+                                                if a["attempts"] else None)}
+            for arm, a in sorted(by.items())}
 
 
 # --------------------------------------------------------------------------- servers
@@ -2007,6 +2415,14 @@ def main(argv: list[str] | None = None) -> int:
                             "deterministic identity-before-write guard "
                             "(slh.guards.identity); off by default, recorded in the "
                             "run identity when on")
+        p.add_argument("--pin-openings", choices=("auto", "on", "off"), default="auto",
+                       help="replay one simulator opening per (scenario, seed) to every "
+                            "arm (slh.xp.phase2.openings); auto (default) = on for a new "
+                            "run directory, as recorded for an existing one")
+        p.add_argument("--consent-chain", type=Path, default=None, metavar="CONFIG.json",
+                       help="step-4 consent guard chain per arm name ({\"arms\": {arm: "
+                            "{mode, checker}}}; slh.guards.consent); off by default, "
+                            "recorded in the run identity when on")
     p = sub.add_parser("status")
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("check-servers", help="smoke step: both servers answer with the "
@@ -2053,7 +2469,8 @@ def main(argv: list[str] | None = None) -> int:
                       if k.strip()) or None
         summary = run(args.package, args.out, mode=mode, endpoint=endpoint,
                       workers=args.workers, export=False if args.no_export else None,
-                      identity_guard=guard)
+                      identity_guard=guard, pin_openings=args.pin_openings,
+                      consent_chain=args.consent_chain)
     except Refused as exc:
         print(json.dumps({"status": "refused", "reason": redact_text(exc)}, indent=1))
         return EXIT_REFUSED

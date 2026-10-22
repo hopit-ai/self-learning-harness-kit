@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "45a927fb1bb1b29c92d426e6d57fce5253a4cdbe",
-  "tree": "bf04beeb5f6b1241b723e6bc4636ca98b1a85148"
+  "commit": "0e988244eff2a9fc6ad13ce349fd56544deb3d34",
+  "tree": "c484c15b3fdc05a70df9f4e5de4036ce1121c9a2"
  },
  "files": {
   ".gitignore": {
@@ -22,12 +22,12 @@
   "README-plain.md": {
    "bytes": 5556,
    "mode": "644",
-   "sha256": "7a60a1f55e17e2e663678bd01ee4ae8ab20cdcbc40fe00e48c3e2b4bfb97e4af"
+   "sha256": "c45fe97583720927499e9412c2899dc60bf332931ef4d499a86c77aaf2d2b66b"
   },
   "README.md": {
-   "bytes": 2129,
+   "bytes": 2273,
    "mode": "644",
-   "sha256": "1965604c75a31748ccdac0e70bc2c86add5153c75d29ed7b5e64f2906fedad1d"
+   "sha256": "b9289899920db5a4b9585f2c5c80a8401fc6ee560198e7cbed674c0817afa822"
   },
   "configs/a0-vllm.yaml": {
    "bytes": 1026,
@@ -79,15 +79,20 @@
    "mode": "644",
    "sha256": "e2abb8fb625ceedc34c01548e58a850e892ccc6717970547b8a3665ebc794537"
   },
-  "docs/xp/handoff2-bfcl-runbook.md": {
-   "bytes": 10215,
+  "docs/xp/handoff3-bfcl-runbook.md": {
+   "bytes": 12486,
    "mode": "644",
-   "sha256": "bcab283bab7e732ebffa03d20c2792b7ca8d52363f24c7c9dbd0361dd1ef8a1a"
+   "sha256": "d238d15a0fd0dd8e58bfc4e943ec321dd88817c8bcbf121dc928b693a6969141"
   },
-  "package-bfcl-h2/plan.json": {
-   "bytes": 829796,
+  "package-bfcl-h3-official/plan.json": {
+   "bytes": 22353,
    "mode": "644",
-   "sha256": "6a9e92c650e7c515e53acbec05dd441b593af551f983fe07451cc7012b9f1509"
+   "sha256": "2418beadda784f8a8e7b5532f1720222c8394f7903357060612dc24392adff47"
+  },
+  "package-bfcl-h3/plan.json": {
+   "bytes": 1442079,
+   "mode": "644",
+   "sha256": "d963d9607622a1bc89b819d217fa61cb6aa231fa523a00919be99f55ed88caa3"
   },
   "pyproject.toml": {
    "bytes": 1419,
@@ -465,14 +470,14 @@
    "sha256": "910d895daf560423a5ac00f34330f173fd171cf90c9d64d13b489ac9fbc1c623"
   },
   "slh/xp/bfcl/plan.py": {
-   "bytes": 19166,
+   "bytes": 23857,
    "mode": "644",
-   "sha256": "8b198ce3af9bde1f8a683b06cfeed7985596570b389c28d918981b3f83a83df8"
+   "sha256": "e0872b44912cd18cdaa7340620ca09f645a1cff44fe595451ef4362ec4f9726a"
   },
   "slh/xp/bfcl/runner.py": {
-   "bytes": 37938,
+   "bytes": 39522,
    "mode": "644",
-   "sha256": "30a1a567d5eb7aa2f914753a560092f74d4e4cd915f86ff7d96807be22777d27"
+   "sha256": "c887e4fa472c4d1d4d9e365952951bdda4b77196d4139323f751ea2d74f8226a"
   },
   "slh/xp/bfcl/splits.py": {
    "bytes": 14327,
@@ -615,9 +620,14 @@
    "sha256": "bd2615c33a3f5bb5585c46445cc470ddc069f436caa7e6cd279937bac0abdebc"
   },
   "slh/xp/phase2/export.py": {
-   "bytes": 9265,
+   "bytes": 10779,
    "mode": "644",
-   "sha256": "a9b0c6024dbb118d0f4eec7719c626e9b3569ddae10db7fcf5409d0019f0495f"
+   "sha256": "73953a692512e116566b15326bb2f0613784d2318c1622670d3707019de63084"
+  },
+  "slh/xp/phase2/openings.py": {
+   "bytes": 15300,
+   "mode": "644",
+   "sha256": "668f0ca62cbb332ab28b57e720e40f61b464d6064de9fb72c6717e11c6224c0c"
   },
   "slh/xp/phase2/package.py": {
    "bytes": 29411,
@@ -625,9 +635,9 @@
    "sha256": "12312a62f5128662947cdb28c97cd09544369d53f4002c3471c7c755f80ed854"
   },
   "slh/xp/phase2/run.py": {
-   "bytes": 98766,
+   "bytes": 121009,
    "mode": "644",
-   "sha256": "0802b67366e020dc16972aea783629fecf42042338bfc4fd647851bed18a5061"
+   "sha256": "d255bf3ed310474dd9d225ed2e40a42b52c50ad84c46250b2c36d55c6ab63ae0"
   },
   "slh/xp/retaildb.py": {
    "bytes": 7729,
@@ -682,7 +692,7 @@
  },
  "kit_repo": "hopit-ai/self-learning-harness-kit",
  "phase1_package": false,
- "plan_id": "xp-h2b-2026-10-19",
+ "plan_id": "xp-h3b-2026-10-22",
  "plan_sha256": null,
  "registration_sha256": null,
  "release": {
@@ -708,11 +718,19 @@
     "sha256": "d67df2fa5518996ff5a5f74db92f27bfa1b800b73e744421882ced5b5405021e"
    }
   },
-  "handoff": "Hand-off 2 (function-calling benchmark)",
+  "handoff": "Hand-off 3 (function-calling benchmark)",
   "kit_repo": "hopit-ai/self-learning-harness-kit",
   "packages": {
-   "package-bfcl-h2": {
-    "cells": 47,
+   "package-bfcl-h3": {
+    "arms": [
+     "B1",
+     "B1P",
+     "MEMORY",
+     "PERSON",
+     "SEARCH",
+     "UNGATED"
+    ],
+    "cells": 24,
     "decoding": {
      "name": "sampled",
      "sampling": {
@@ -720,42 +738,50 @@
      },
      "temperature": 0.7
     },
-    "draws": {
-     "S": 14,
-     "U": 32
+    "empty_arms": [
+     "FPRIME"
+    ],
+    "episodes": 5760,
+    "libraries": {
+     "B1P": "13a18555997fba1ef8afa9b9928b479a5992ac25a116ae38f9f146b56a325266",
+     "FPRIME": "0fa53bd8d19ee8639a77654c8dba2ea9af521132166454eed32b6e1e916e5f19",
+     "MEMORY": "a3394317efd5a1fd97a50dc0bde57ec156117b5de9876e09d0e090b41bd2508a",
+     "PERSON": "622cd48d14d3dd035c17ca02613084bace88fb83043a1328cf4a6722f8da037a",
+     "SEARCH": "a6d4eefc09107d630fe2d9e85e7d1459a3ab037394a9fa15f1d6bf246d0a9685",
+     "UNGATED": "d4a5b8bec6f23d16f37da91f020106ba8b4dddca58cd3746247a0c5dfeea24c8"
     },
-    "episodes": 2820,
-    "plan_sha256": "c26b6fd8e589d7354e12ac89ef8eebe5f29124c4a6578a47c1ff4f35c334dbd6",
-    "pools": {
-     "S": {
-      "lessons": 4,
-      "sha256": "735bd4d2bc6ffb1028d2fc425984a349ae38c97bab993ffc1b4624204d85a588"
-     },
-     "U": {
-      "lessons": 8,
-      "sha256": "03c07bee06715bda7c826c879b7f940ee3789d15606ed6215bf1511d50e116d7"
-     }
+    "plan_sha256": "254044ee0f62c28a666ee573a13b1a596b022ddfedc84f376249565997e4b680",
+    "what": "part E: function-calling benchmark, confirmation on the held-out test split (frozen libraries, 4 trials)"
+   },
+   "package-bfcl-h3-official": {
+    "cells": 1,
+    "decoding": {
+     "name": "official",
+     "sampling": {},
+     "temperature": 0.001
     },
-    "what": "part D: function-calling benchmark, randomized lesson inclusion on the gate split (empty-library anchors)"
+    "episodes": 240,
+    "plan_sha256": "dbadc59e509d5afca6172859d11e43eb724839dfff2f87f66c6d56e54ef81216",
+    "what": "part E: one descriptive standard-harness trial on the test split at the official temperature"
    }
   },
   "part_names": {
-   "D": "function-calling benchmark: randomized lesson inclusion on the gate split"
+   "E": "function-calling benchmark: confirmation on the held-out test split"
   },
   "parts": [
-   "D"
+   "E"
   ],
   "phase1_package": false,
   "rehearsal": false,
-  "runbook": "docs/xp/handoff2-bfcl-runbook.md",
+  "runbook": "docs/xp/handoff3-bfcl-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "xp-h2b-v1"
+  "tag": "xp-h3b-v1"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "xp-h2b-v1"
+  "phase1": "xp-h3b-v1"
  },
- "total_bytes": 2929067,
+ "total_bytes": 3611450,
  "variant": "plain"
 }

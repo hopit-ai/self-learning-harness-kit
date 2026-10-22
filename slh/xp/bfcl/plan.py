@@ -3,7 +3,8 @@
     python -m slh.xp.bfcl.plan h1 --out PKG-H1
     python -m slh.xp.bfcl.plan h2 --pool-evidence POOL-U.json --pool-search POOL-S.json --out PKG-H2
     python -m slh.xp.bfcl.plan freeze --arm ARM --text FILE|--library LIB.json --out LIB-ARM.json
-    python -m slh.xp.bfcl.plan h3 --libraries LIBDIR --out PKG-H3
+    python -m slh.xp.bfcl.plan freeze-selected --arm FPRIME|SEARCH --pool POOL.json --report FPRIME-X.json --out LIB-ARM.json
+    python -m slh.xp.bfcl.plan h3 --libraries LIBDIR --out PKG-H3 [--arms B1,SEARCH,...]
     python -m slh.xp.bfcl.plan h3-official --out PKG-H3-OFFICIAL   # descriptive B1, T=0.001
 
 A package is one directory with ``plan.json``: the cells to run (one cell = one arm x
@@ -256,6 +257,35 @@ def freeze_library(arm: str, *, text: str | None = None, memory: dict[str, Any] 
                  "provenance": provenance})
 
 
+def freeze_selected(arm: str, pool: dict[str, Any], report: dict[str, Any], *,
+                    report_sha256: str) -> dict[str, Any]:
+    """The FPRIME (pool U) or SEARCH (pool S) library from the primary F' report: the
+    advanced set rendered exactly as in F' (the rule of ``slh.xp.fgate.pool.render``,
+    canonical order; not imported, so the kit's part B/C import closure is unchanged).
+    An empty advanced set gives an empty text: the arm is B1 (plan s. 5, s. 6.1)."""
+    want = {"FPRIME": "U", "SEARCH": "S"}
+    if arm not in want:
+        raise PlanRefused("freeze-selected is for FPRIME (pool U) or SEARCH (pool S)")
+    verify_pool(pool)
+    if pool["pool"] != want[arm]:
+        raise PlanRefused(f"{arm} is selected from pool {want[arm]}, not {pool['pool']}")
+    if report.get("schema") != "xp-bfcl-fprime-report-v1" or \
+            report.get("pool_sha256") != pool["sha256"]:
+        raise PlanRefused("report is not the primary F' report of this pool")
+    ids = [les["id"] for les in pool["lessons"]]
+    adv = list(report.get("advanced") or [])
+    if not set(adv) <= set(ids):
+        raise PlanRefused(f"advanced {adv} not in pool {ids}")
+    chosen = [les["text"] for les in pool["lessons"] if les["id"] in adv]
+    text = "## Lessons\n" + "\n".join(chosen) if chosen else ""
+    prov = {"evidence_roles": (pool.get("provenance") or {}).get("evidence_roles", []),
+            "selection_roles": ["gate"], "pool": pool["pool"], "pool_sha256": pool["sha256"],
+            "fprime_report_sha256": report_sha256, "advanced": adv,
+            "rule": "plan s. 5: the arm is the advanced set of the primary (official-score) "
+                    "F' report; an empty set means the arm is B1"}
+    return freeze_library(arm, text=text, provenance=prov)
+
+
 def notes_for(library: dict[str, Any] | None, entry: dict[str, Any] | None = None) -> str:
     if library is None:
         return ""
@@ -270,13 +300,29 @@ def notes_for(library: dict[str, Any] | None, entry: dict[str, Any] | None = Non
 # --------------------------------------------------------------------------- H3
 
 
+# Proposed deviation B-D9 (2026-10-22, PROPOSED, not approved; docs/xp/bfcl-plan.md s. 0):
+# L* is empty, so FPRIME is B1 and the registered family P1-P3 has no informative member
+# about evidence-learned lessons; the proposed H3 runs B1 and SEARCH (primary: SEARCH - B1)
+# plus UNGATED (descriptive), and the official-temperature B1 trial (``h3-official``).
+H3_ARMS_BD9 = ("B1", "SEARCH", "UNGATED")
+
+
 def build_h3(man: dict[str, Any], libraries: dict[str, dict[str, Any]], *,
              decoding: str = DEFAULT_DECODING, trials: int = TRIALS_TEST,
-             package: Path | None = None) -> dict[str, Any]:
+             package: Path | None = None, arms: tuple[str, ...] | None = None
+             ) -> dict[str, Any]:
+    """Every library is frozen and checked; ``arms`` (default: all seven, as registered)
+    selects the arms that get cells. Run order is trial-major in the order of ``arms``
+    (B1 t0, SEARCH t0, ..., B1 t1, ...), so a run stopped at its cap leaves the first arms
+    with paired, equal numbers of trials."""
     test = splits.instances(man, "test")
     missing = sorted(set(ARMS) - {"B1"} - set(libraries))
     if missing:
         raise PlanRefused(f"frozen libraries missing for {missing}")
+    run_arms = tuple(ARMS) if arms is None else tuple(arms)
+    if "B1" not in run_arms or len(set(run_arms)) != len(run_arms) or \
+            not set(run_arms) <= set(ARMS):
+        raise PlanRefused(f"arms {run_arms}: distinct arms from {sorted(ARMS)}, B1 included")
     entries = {}
     for cat in data.PRIMARY:
         for e in data.load_category(cat, package):
@@ -295,6 +341,8 @@ def build_h3(man: dict[str, Any], libraries: dict[str, dict[str, Any]], *,
             and not lib["text"]
         if same_as_b1:  # an empty F'/search selection: the arm is B1 itself (reported)
             continue
+        if arm not in run_arms:
+            continue
         if arm == "PERSON" and sha_text(lib["text"]) != PERSON_LIBRARY_SHA256:
             raise PlanRefused("PERSON text differs from the frozen person-written library")
         for t in range(trials):
@@ -306,11 +354,20 @@ def build_h3(man: dict[str, Any], libraries: dict[str, dict[str, Any]], *,
                     notes[h] = text
                 units.append({"instance": inst, "notes_sha256": h})
             cells.append(_cell(f"h3-{arm.lower()}-t{t}", arm, t, "confirmation", units))
-    return _package("h3", man, cells, notes, decoding=decoding,
-                    extra={"libraries": frozen,
-                           "empty_arms": sorted(a for a, lib in libraries.items()
-                                                if lib["kind"] == "static" and not lib["text"]
-                                                and a != "B1P")})
+    empty = sorted(a for a, lib in libraries.items()
+                   if lib["kind"] == "static" and not lib["text"] and a != "B1P")
+    bad = sorted(set(run_arms) & set(empty))
+    if arms is not None and bad:
+        raise PlanRefused(f"arms {bad} are empty selections (= B1); they are never run")
+    rank = {a: k for k, a in enumerate(run_arms)}
+    order = [c["cell_id"] for c in sorted(cells, key=lambda c: (c["trial"], rank[c["arm"]]))]
+    extra: dict[str, Any] = {"libraries": frozen, "empty_arms": empty, "order": order}
+    if arms is not None:
+        extra["design"] = {"arms_run": list(run_arms),
+                           "arms_not_run": sorted(set(ARMS) - set(run_arms) - set(empty)),
+                           "deviation": "B-D9" if set(run_arms) != set(ARMS) - set(empty)
+                           else None}
+    return _package("h3", man, cells, notes, decoding=decoding, extra=extra)
 
 
 def build_b1_official(man: dict[str, Any]) -> dict[str, Any]:
@@ -355,6 +412,13 @@ def main(argv: list[str] | None = None) -> int:
     h3.add_argument("--libraries", type=Path, required=True,
                     help="directory with LIB-<ARM>.json for every arm except B1")
     h3.add_argument("--out", type=Path, required=True)
+    h3.add_argument("--arms", help="comma-separated arms to run (default: all, as "
+                    "registered); e.g. B1,SEARCH,UNGATED (proposed deviation B-D9)")
+    fs = sub.add_parser("freeze-selected", help="FPRIME/SEARCH library from the F' report")
+    fs.add_argument("--arm", required=True, choices=["FPRIME", "SEARCH"])
+    fs.add_argument("--pool", type=Path, required=True)
+    fs.add_argument("--report", type=Path, required=True)
+    fs.add_argument("--out", type=Path, required=True)
     h3o = sub.add_parser("h3-official", help="one B1 trial on test at temperature 0.001")
     h3o.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
@@ -372,6 +436,15 @@ def main(argv: list[str] | None = None) -> int:
         args.out.write_text(json.dumps(lib, indent=1, sort_keys=True) + "\n")
         print(json.dumps({"arm": lib["arm"], "sha256": lib["sha256"]}))
         return 0
+    elif args.cmd == "freeze-selected":
+        raw = args.report.read_bytes()
+        lib = freeze_selected(args.arm, json.loads(args.pool.read_text()), json.loads(raw),
+                              report_sha256=hashlib.sha256(raw).hexdigest())
+        args.out.write_text(json.dumps(lib, indent=1, sort_keys=True) + "\n")
+        print(json.dumps({"arm": lib["arm"], "sha256": lib["sha256"],
+                          "advanced": lib["provenance"]["advanced"],
+                          "empty": not lib["text"]}))
+        return 0
     elif args.cmd == "h3-official":
         pkg = build_b1_official(man)
     else:
@@ -379,7 +452,8 @@ def main(argv: list[str] | None = None) -> int:
         for p in sorted(args.libraries.glob("LIB-*.json")):
             lib = json.loads(p.read_text())
             libs[lib["arm"]] = lib
-        pkg = build_h3(man, libs, decoding=args.decoding)
+        pkg = build_h3(man, libs, decoding=args.decoding,
+                       arms=tuple(args.arms.split(",")) if args.arms else None)
     write_package(pkg, args.out)
     print(json.dumps({"handoff": pkg["handoff"], "cells": len(pkg["cells"]),
                       "episodes": sum(len(c["units"]) for c in pkg["cells"]),

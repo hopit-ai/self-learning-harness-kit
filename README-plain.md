@@ -1,6 +1,6 @@
-# Plain runbook: environment and servers (plan xp-h2b-2026-10-19)
+# Plain runbook: environment and servers (plan xp-h3b-2026-10-22)
 
-Code snapshot `45a927fb1bb1b29c92d426e6d57fce5253a4cdbe`. This kit runs no phase 1 and ships no phase-1
+Code snapshot `0e988244eff2a9fc6ad13ce349fd56544deb3d34`. This kit runs no phase 1 and ships no phase-1
 package: the release's runbook (see README.md) names the packages and commands to run.
 Sections 1 and 2 below are the environment and the server settings it refers to.
 
