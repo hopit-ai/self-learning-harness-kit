@@ -1,0 +1,6 @@
+name: slh-bridge
+version: "1.0"
+description: "Self-learning harness bridge: every tool call is mediated by the harness guard chain; task tools execute on the harness side."
+author: "self-learning-harness"
+provides_hooks:
+  - pre_tool_call

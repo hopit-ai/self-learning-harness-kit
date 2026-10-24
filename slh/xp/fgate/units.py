@@ -29,6 +29,14 @@ deadline stop the model server first (nothing more can be decided), then Ctrl-C.
 The export (at most ``export_cap_bytes``) holds ``decisions.jsonl.gz`` (allowlisted
 fields only), ``env.json`` and ``manifest.json``. Nothing in it is scored here: the
 answer keys stay with us.
+
+**Read turns (from 2026-10-23; deviation XD2, docs/xp/deviations.md).** A decision's
+live read calls run on the database the plan's prefixes were built on
+(``plan["retail_db"]["name"]``, passed to ``EndpointDecider``); startup refuses (exit 4)
+a decider whose database differs from the plan's, and each row exports ``reads`` (name
+and error flag of every read turn). Packages registered before (``xp-h1b-v1``) keep their
+registered code: there the reads ran on the original database and rows carry no
+``reads`` (``read_export`` accepts both row shapes).
 """
 
 from __future__ import annotations
@@ -52,7 +60,10 @@ EXPORT_SCHEMA = "xp-h1-export-v1"
 SMOKE_PREFIXES = 2
 ROW_FIELDS = ("schema", "unit_id", "track", "case_id", "case_hash", "prompt_hash", "x",
               "action", "tokens", "model_calls", "capped", "case_time_limit", "error_class",
-              "wall_s")
+              "wall_s", "reads")
+# Rows of packages registered before XD2 (2026-10-23) carry no ``reads``.
+LEGACY_ROW_FIELDS = tuple(f for f in ROW_FIELDS if f != "reads")
+READ_FIELDS = ("name", "error")
 ACTION_FIELDS = ("type", "name", "arguments", "content", "extra_calls", "reason")
 ENDPOINT_FINGERPRINT = ("base_url", "model", "api_key_env", "model_revision", "vllm_version",
                         "serving_args", "replicas", "concurrency")
@@ -109,6 +120,84 @@ def code_mismatches(code: dict[str, str], root: Path = pc.REPO) -> list[str]:
         elif pc.sha_file(p) != sha:
             out.append(f"changed {rel}")
     return out
+
+
+def plan_retail_db(plan: dict[str, Any]) -> str:
+    """The pinned retail database the plan's prefixes were built on (``original`` for a
+    plan that names none)."""
+    from slh.xp import retaildb
+
+    rec = plan.get("retail_db") or {}
+    name = rec.get("name") or retaildb.ORIGINAL
+    if rec.get("sha256") and rec["sha256"] != retaildb.spec(name)["sha256"]:
+        raise Refused(f"plan retail_db {name}: sha256 differs from the pinned database")
+    return name
+
+
+def decider_db_problems(plan: dict[str, Any], decider: Any) -> list[str]:
+    """A decider that runs read turns must run them on the plan's database. A decider
+    without ``retail_db`` (fake deciders: no read turns) is not checked."""
+    have = getattr(decider, "retail_db", None)
+    want = plan_retail_db(plan)
+    if have is not None and have != want:
+        return [(f"decider reads on retail database {have!r}, the plan's prefixes were "
+                 f"built on {want!r}")]
+    return []
+
+
+def retail_db_problems(pkg: dict[str, Any], *, probes: int = 3) -> list[str]:
+    """Preflight: the plan's database file is here and matches its pin, and the decider's
+    read environment (``decide.read_environment``) answers the package's own prefix reads
+    (``get_user_details`` / ``get_order_details``) exactly as recorded in the prefixes.
+    On an extension database the probes are reads of SYNTHETIC ids (absent from the
+    original database), which only the right database can answer; a package on an
+    extension with no such read is refused."""
+    from slh.demo1.decide import read_environment
+    from slh.xp import retaildb
+
+    try:
+        name = plan_retail_db(pkg["plan"])
+        if name != retaildb.ORIGINAL:
+            retaildb.verify(name)
+        env = read_environment(name)
+    except Exception as exc:  # noqa: BLE001 - reported
+        return [f"retail_db: {exc}"[:300]]
+    from tau2.data_model.message import ToolCall
+
+    known: dict[str, set[str]] = {"get_user_details": set(), "get_order_details": set()}
+    if name != retaildb.ORIGINAL:
+        orig = retaildb.load(retaildb.ORIGINAL)
+        known = {"get_user_details": set(orig["users"]),
+                 "get_order_details": set(orig["orders"])}
+    arg = {"get_user_details": "user_id", "get_order_details": "order_id"}
+    problems: list[str] = []
+    done = 0
+    for q in pkg["questions"].values():
+        msgs = q.get("messages") or []
+        for k, m in enumerate(msgs[:-1]):
+            call = (m.get("tool_calls") or [None])[0]
+            if not call or call["name"] not in arg:
+                continue
+            result = msgs[k + 1]
+            if result.get("role") != "tool" or "not found" in (result.get("content") or ""):
+                continue
+            if str((call.get("arguments") or {}).get(arg[call["name"]])) in known[call["name"]]:
+                continue  # an original id: both databases answer it alike
+            got = env.get_response(ToolCall(id=call["id"], name=call["name"],
+                                            arguments=dict(call["arguments"]),
+                                            requestor="assistant"))
+            if got.error or got.content != result["content"]:
+                problems.append(f"retail_db {name}: {call['name']} in {q['case_id']} is "
+                                "answered differently from the prefix (decider reads on "
+                                "another database)")
+            done += 1
+            break
+        if done >= probes or problems:
+            break
+    if not done and not problems and name != retaildb.ORIGINAL:
+        problems.append(f"retail_db {name}: no prefix reads a synthetic id; the read "
+                        "environment cannot be probed")
+    return problems
 
 
 def smoke_units(units: list[dict[str, Any]], questions: dict[str, dict[str, Any]],
@@ -176,7 +265,11 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
             from slh.xp.partner.runner import EndpointDecider
 
             decider = EndpointDecider(endpoint, seed=int(plan["seed"]),
-                                      max_output_tokens=int(plan["limits"]["max_output_tokens"]))
+                                      max_output_tokens=int(plan["limits"]["max_output_tokens"]),
+                                      retail_db=plan_retail_db(plan))
+    problems = decider_db_problems(plan, decider)
+    if problems:
+        raise Refused("; ".join(problems))
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     ident = {**identity(pkg, mode=mode, endpoint=endpoint), "smoke": bool(smoke)}
@@ -258,7 +351,9 @@ def run(package: Path, out: Path, *, endpoint: dict[str, Any] | None, dry_run: b
                            "completion": int(value.get("output_tokens", 0) or 0)},
                 "model_calls": int(value.get("model_calls", 0) or 0),
                 "capped": bool(value.get("capped")), "case_time_limit": timed_out,
-                "error_class": error_class, "wall_s": round(time.perf_counter() - started, 3)}
+                "error_class": error_class, "wall_s": round(time.perf_counter() - started, 3),
+                "reads": [{k: (bool(r.get(k)) if k == "error" else r.get(k))
+                           for k in READ_FIELDS} for r in (value.get("reads") or [])]}
 
     started = time.time()
     written = 0
@@ -362,6 +457,9 @@ def export(run_dir: Path, out: Path, *, cap_bytes: int | None = None) -> dict[st
     for r in pc.read_jsonl(run_dir / "decisions.jsonl"):
         if set(r) - set(ROW_FIELDS):
             raise ValueError(f"{r.get('unit_id')}: unlisted fields {sorted(set(r) - set(ROW_FIELDS))}")
+        if set(ROW_FIELDS) - set(r):
+            raise ValueError(f"{r.get('unit_id')}: missing fields "
+                             f"{sorted(set(ROW_FIELDS) - set(r))} (a run started before XD2?)")
         pc.assert_no_gold(r, f"row {r['unit_id']}")
         rows.append({k: r[k] for k in ROW_FIELDS})
     data, n = pc.jsonl_bytes(sorted(rows, key=lambda r: r["unit_id"]))
@@ -399,9 +497,12 @@ def read_export(export_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
         if pc.sha_file(export_dir / name) != meta["sha256"]:
             raise ValueError(f"{name} differs from the manifest")
     rows = pc.read_jsonl(export_dir / "decisions.jsonl.gz")
-    for r in rows:
-        if set(r) != set(ROW_FIELDS):
-            raise ValueError(f"{r.get('unit_id')}: row fields differ from the allowlist")
+    shapes = {frozenset(r) for r in rows}
+    if len(shapes) > 1 or (shapes and next(iter(shapes)) not in
+                           (frozenset(ROW_FIELDS), frozenset(LEGACY_ROW_FIELDS))):
+        bad = next(r for r in rows if set(r) not in (set(ROW_FIELDS), set(LEGACY_ROW_FIELDS))
+                   or frozenset(r) != frozenset(rows[0]))
+        raise ValueError(f"{bad.get('unit_id')}: row fields differ from the allowlist")
     return man, rows
 
 

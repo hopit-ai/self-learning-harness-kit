@@ -12,9 +12,13 @@ the trial-0 seed of the run seed, tau2's reply parsing and the think loop.
 
 The case history goes in as the agent's message history; the agent's
 ``generate_next_message`` is called on the last tool result. If the next
-action is a read-only retail tool call, it is executed on the unmodified public
-database and the agent continues, at most ``MAX_READS`` times; a write call is
-never executed. Nothing is written to any database.
+action is a read-only retail tool call, it is executed on the database the case
+prefixes were built on (``AgentClient(retail_db=...)``, a pinned
+``slh.xp.retaildb`` name; default ``original``, the unmodified public database)
+and the agent continues, at most ``MAX_READS`` times; a write call is never
+executed. Nothing is written to any database. (Until 2026-10-23 the reads always
+ran on the original database, also for prefixes built on ``ext-v2``: deviation XD2,
+docs/xp/deviations.md; packages registered before then keep that behaviour.)
 
 Request limits (deviation D5, window B retry; demo code only, the runner and
 its client are unchanged): every request carries ``max_tokens`` =
@@ -310,8 +314,18 @@ class AgentClient:
 
     def __init__(self, config: Any = None, *, pin: dict[str, str] | None = None,
                  level: str | None = None, temperature: float | None = None,
-                 backend_factory: Callable[[Any], Any] | None = None) -> None:
+                 backend_factory: Callable[[Any], Any] | None = None,
+                 retail_db: str | None = None) -> None:
+        from slh.xp import retaildb
+
         self.config = config or runner_config()
+        # The pinned database a decision's read turns run on: the one the case prefixes
+        # were built on (a package's ``plan["retail_db"]["name"]``). An extension file
+        # is checked against its pin here; the original is tau2's vendored file.
+        self.retail_db = retail_db or retaildb.ORIGINAL
+        self.retail_db_sha256 = retaildb.spec(self.retail_db)["sha256"]
+        if self.retail_db != retaildb.ORIGINAL:
+            retaildb.verify(self.retail_db)
         self.pin = pin
         self.level = level or "messages"
         changes: dict[str, Any] = {"max_tokens": MAX_OUTPUT_TOKENS}
@@ -345,21 +359,30 @@ class AgentClient:
 
     def with_temperature(self, temperature: float) -> AgentClient:
         other = AgentClient(self.config, pin=self.pin, level=self.level,
-                            temperature=temperature, backend_factory=self._factory)
+                            temperature=temperature, backend_factory=self._factory,
+                            retail_db=self.retail_db)
         other.stage_deadline = self.stage_deadline
         return other
 
     def parts(self) -> tuple[Any, Any, Any]:
-        """(backend, meter, environment) of this thread."""
+        """(backend, meter, environment) of this thread. The environment answers the
+        decision's read turns on ``self.retail_db`` (one fresh copy per thread)."""
         if not hasattr(self._local, "parts"):
-            from tau2.registry import registry
-
             meter = demo_meter(self.config)
             backend = self._factory(self.model) if self._factory else \
                 demo_backend(self.model, self.level, self.pin, meter)
             backend.request_meter = meter
-            self._local.parts = (backend, meter, registry.get_env_constructor("retail")())
+            self._local.parts = (backend, meter, read_environment(self.retail_db))
         return self._local.parts
+
+
+def read_environment(retail_db: str | None = None) -> Any:
+    """A fresh tau2 retail environment on the pinned database ``retail_db``
+    (``slh.xp.retaildb.env``; ``original`` is tau2's registered ``retail`` constructor,
+    exactly as before)."""
+    from slh.xp import retaildb
+
+    return retaildb.env(retail_db or retaildb.ORIGINAL)
 
 
 def _new_decision(backend: Any) -> None:

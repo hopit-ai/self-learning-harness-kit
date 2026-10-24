@@ -121,7 +121,8 @@ class EndpointDecider:
     and a pairwise selector, as POC 9. Not run against a live endpoint here."""
 
     def __init__(self, endpoint: dict[str, Any], *, seed: int, max_output_tokens: int,
-                 margin: int | None = None, growth: int | None = None) -> None:
+                 margin: int | None = None, growth: int | None = None,
+                 retail_db: str | None = None) -> None:
         import yaml
 
         from slh.budget import ModelConfig
@@ -135,7 +136,11 @@ class EndpointDecider:
                    api_key_env=endpoint.get("api_key_env"), capture="messages")
         config = dataclasses.replace(base, agent=ModelConfig.from_dict(raw), seed=int(seed))
         self.decide_mod = decide
-        self.client = decide.AgentClient(config)
+        # Read turns run on the database the package's prefixes were built on (the
+        # plan's ``retail_db``; default original). XD2: before 2026-10-23 this was always
+        # the original database (packages registered then keep that code).
+        self.client = decide.AgentClient(config, retail_db=retail_db)
+        self.retail_db = self.client.retail_db
         self.sampler = self.client.with_temperature(decide.SAMPLE_TEMPERATURE)
         from slh.xp.partner import context
 
@@ -734,7 +739,8 @@ def build_real(endpoint: dict[str, Any], plan: dict[str, Any]) -> tuple[Any, Any
     rule = (plan.get("learning") or {}).get("full_context") or {}
     decider = EndpointDecider(endpoint, seed=int(plan["seed"]),
                               max_output_tokens=int(plan["limits"]["max_output_tokens"]),
-                              margin=rule.get("margin"), growth=rule.get("decision_growth"))
+                              margin=rule.get("margin"), growth=rule.get("decision_growth"),
+                              retail_db=(plan.get("retail_db") or {}).get("name"))
     teacher_cfg = endpoint.get("teacher") or {}
     needs_teacher = any(w.startswith("T") for w in plan["writers"]) or \
         "teacher" in plan["critic"].values()

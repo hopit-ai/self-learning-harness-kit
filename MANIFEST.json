@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "0e988244eff2a9fc6ad13ce349fd56544deb3d34",
-  "tree": "c484c15b3fdc05a70df9f4e5de4036ce1121c9a2"
+  "commit": "8cc105e53fe9b2b922d14cbba4caadc8e35a053b",
+  "tree": "2bd6e2de1ae91265b3fa4dc6700febf889d1d015"
  },
  "files": {
   ".gitignore": {
@@ -20,119 +20,34 @@
    "sha256": "94fd626be3e6a82b8e13d7ca92dfaef3fc7c770c30f7e7ec30fb92e71874fe72"
   },
   "README-plain.md": {
-   "bytes": 5556,
+   "bytes": 5553,
    "mode": "644",
-   "sha256": "c45fe97583720927499e9412c2899dc60bf332931ef4d499a86c77aaf2d2b66b"
+   "sha256": "31afeeca0afbc6fffe702299493d583ea9870540347b6614eefc31755cc6da97"
   },
   "README.md": {
-   "bytes": 2273,
+   "bytes": 2198,
    "mode": "644",
-   "sha256": "b9289899920db5a4b9585f2c5c80a8401fc6ee560198e7cbed674c0817afa822"
+   "sha256": "d6b2775e71cc03f3f3f387f28534cb032ffcacf3e696b7e4a3ca91f96b3f2cb0"
   },
-  "configs/a0-vllm.yaml": {
-   "bytes": 1026,
+  "docs/xp/handoff-mh1-runbook.md": {
+   "bytes": 12445,
    "mode": "644",
-   "sha256": "249a62bb2c05dcc36adf7de722c3ab814343eaf3d4d3ef0da469cb89e6fa8535"
-  },
-  "configs/agent-vllm.yaml": {
-   "bytes": 1972,
-   "mode": "644",
-   "sha256": "d34b3a8c543492ecfac8528cf63ed34538e181a69e5e78654d0b1ef1b2d22f67"
-  },
-  "configs/arm-think-vllm.yaml": {
-   "bytes": 1114,
-   "mode": "644",
-   "sha256": "bcc88792d283c3d576c0d77cd83958c756d5646e2218499589947e234f3c69cd"
-  },
-  "configs/poc9-teacher.yaml": {
-   "bytes": 1961,
-   "mode": "644",
-   "sha256": "eb6ebf2805050490ab2b7948e02d97bfd267bf29ed11b4864c2efe9d2e5318aa"
-  },
-  "configs/prices.yaml": {
-   "bytes": 5136,
-   "mode": "644",
-   "sha256": "761499d24e58d36e13d6b954947e0f1efe401824abbe17608d49ac4a2296c5ea"
-  },
-  "configs/serving.yaml": {
-   "bytes": 400,
-   "mode": "644",
-   "sha256": "9f33d5bb225f73526bd4c5b767657be54ff1b53d5be55f3da0fa5f3fb7508d8e"
-  },
-  "configs/user.yaml": {
-   "bytes": 1592,
-   "mode": "644",
-   "sha256": "e76820d4c822f5d8dad26e06ca5b533e975e3c1ba617014d9e7942e35b3af8df"
-  },
-  "configs/xp-partner-endpoint.yaml": {
-   "bytes": 1442,
-   "mode": "644",
-   "sha256": "1bbb5e29bd9dec0d24297b010341058c3d3b9611af80c5ba62729f5641aad3b8"
-  },
-  "docs/xp/bfcl-person/library.txt": {
-   "bytes": 2195,
-   "mode": "644",
-   "sha256": "9b0f5e924adbc8ce4a010cfffec8462c3036b68b643cb5c76a20266ab9598b4f"
-  },
-  "docs/xp/bfcl-person/provenance.json": {
-   "bytes": 597,
-   "mode": "644",
-   "sha256": "e2abb8fb625ceedc34c01548e58a850e892ccc6717970547b8a3665ebc794537"
-  },
-  "docs/xp/handoff3-bfcl-runbook.md": {
-   "bytes": 12486,
-   "mode": "644",
-   "sha256": "d238d15a0fd0dd8e58bfc4e943ec321dd88817c8bcbf121dc928b693a6969141"
-  },
-  "package-bfcl-h3-official/plan.json": {
-   "bytes": 22353,
-   "mode": "644",
-   "sha256": "2418beadda784f8a8e7b5532f1720222c8394f7903357060612dc24392adff47"
-  },
-  "package-bfcl-h3/plan.json": {
-   "bytes": 1442079,
-   "mode": "644",
-   "sha256": "d963d9607622a1bc89b819d217fa61cb6aa231fa523a00919be99f55ed88caa3"
+   "sha256": "01edd83ebb9056586ae46f580b1ea1698b52804dbd44b6e15412aa96d030f51b"
   },
   "pyproject.toml": {
-   "bytes": 1419,
+   "bytes": 1574,
    "mode": "644",
-   "sha256": "cbd63245d518711267dd8d87da606db555c33f32e6c28659b432e15019f27542"
-  },
-  "scripts/xp/fetch_vendor.sh": {
-   "bytes": 1307,
-   "mode": "755",
-   "sha256": "96a0063e5118e5cefce2f832ebf54fe0a9e687bf31d3207b6a72d3cb5c05290b"
+   "sha256": "e72fded78c3ba0de661fcc35093998391ffd6e630ff033db86e2bd1df205f75f"
   },
   "scripts/xp/pack_export.sh": {
    "bytes": 1903,
    "mode": "755",
    "sha256": "29c225352baa0691299dfd8f58065745fc2474904dc677a7b1dbe468beffc2d5"
   },
-  "scripts/xp/run_phase1.sh": {
-   "bytes": 1896,
+  "scripts/xp/setup_hermes_offline.sh": {
+   "bytes": 2398,
    "mode": "755",
-   "sha256": "f446ce45bbc313a82a253dda9619b17e9f410e1e15a6d0b8f7286b92edc1fce0"
-  },
-  "scripts/xp/setup_alfworld_offline.sh": {
-   "bytes": 3688,
-   "mode": "755",
-   "sha256": "ebb6aa80ea581d036ea488812bf9b09f6c9eafbe79bbad5773396169bba84532"
-  },
-  "scripts/xp/setup_bfcl_offline.sh": {
-   "bytes": 1159,
-   "mode": "755",
-   "sha256": "0e13740353c1aa3263769f6f4ef40d0eb4b6efac9c244b0a11c44cf00a54aeea"
-  },
-  "scripts/xp/setup_offline.sh": {
-   "bytes": 6364,
-   "mode": "755",
-   "sha256": "58029156dd11807ce0d7158932de5109170d7ef698ba7b5d43619ddbf4052caa"
-  },
-  "scripts/xp/xp_boot.py": {
-   "bytes": 6468,
-   "mode": "644",
-   "sha256": "0e7e350057eff84c1f60e4fe97c99b00d84090b2f2766811259bf7ea3a7e6644"
+   "sha256": "84789e9248e974dc29d59922fee87a594107e4954372755dfb2800260df5fb63"
   },
   "slh/__init__.py": {
    "bytes": 380,
@@ -143,6 +58,16 @@
    "bytes": 11248,
    "mode": "644",
    "sha256": "ea7e838a1d7cf7a19e7d99eafa8837721973078a56b051b1cd3c29503e2afbf5"
+  },
+  "slh/analysis/__init__.py": {
+   "bytes": 83,
+   "mode": "644",
+   "sha256": "b2b6b25dd4f517291eba21c67a5a845f026239ee66f50ef39670baed510be164"
+  },
+  "slh/analysis/s1_consent.py": {
+   "bytes": 55186,
+   "mode": "644",
+   "sha256": "36c0822e651dd9b4c649cdf8ccdc863ed740fee61fe49abaaca5225429a48b2d"
   },
   "slh/arms/__init__.py": {
    "bytes": 79,
@@ -190,9 +115,9 @@
    "sha256": "b0712ebe768ebfb010af296c88cde372205b5690af1f695ecaa7fbe9bf9426c8"
   },
   "slh/demo1/decide.py": {
-   "bytes": 33970,
+   "bytes": 35310,
    "mode": "644",
-   "sha256": "6a5e0a792a90c1cc21e93dc4658f0dc50a01d4abdb93d2928f05350e3db061b1"
+   "sha256": "c00d24a95d8079b8cddf6fdd5e3f2cba1804c7616f7d9232abe0f24a1aea8edf"
   },
   "slh/demo1/estimate.py": {
    "bytes": 12580,
@@ -239,10 +164,35 @@
    "mode": "644",
    "sha256": "35881ebca847dba7e0beaa285d8fb2f432f1de33d4b0aa23a43283cd36d9d0c5"
   },
+  "slh/genpilot/__init__.py": {
+   "bytes": 415,
+   "mode": "644",
+   "sha256": "ce22e75aa63119db242314e04e59a22d1a2227407cd7b9877a63e0fbe3fbf547"
+  },
+  "slh/genpilot/data.py": {
+   "bytes": 3920,
+   "mode": "644",
+   "sha256": "6cbcf682b5967173d368485ee87b576a39397b64783df3c6341966d7bbe58520"
+  },
+  "slh/genpilot/predicates.py": {
+   "bytes": 5304,
+   "mode": "644",
+   "sha256": "90ac9036d54479d3ff51709c163f964a89570bd5933487173108b81be93ea3ec"
+  },
   "slh/guards/__init__.py": {
    "bytes": 517,
    "mode": "644",
    "sha256": "9255b7e2529ef3b90ca59621d14980e444a88f8daa1fb7d56408f359a74c5dea"
+  },
+  "slh/guards/consent.py": {
+   "bytes": 55429,
+   "mode": "644",
+   "sha256": "ee5f833b7448e23569b23431e591554e469b7556b0a8e8f5175b2d38ee5bb6ec"
+  },
+  "slh/guards/consent_plus.py": {
+   "bytes": 15467,
+   "mode": "644",
+   "sha256": "15f18b89dd828722e1356df8dd81953020edb9170a42f9650a1d71a5f46dfc2e"
   },
   "slh/guards/identity.py": {
    "bytes": 15774,
@@ -409,6 +359,151 @@
    "mode": "644",
    "sha256": "43e35c6fc66da9901557dd856925dd5ec2d939a581b36904b7f6f331ac2fe3d4"
   },
+  "slh/system/__init__.py": {
+   "bytes": 1090,
+   "mode": "644",
+   "sha256": "c8a65b0ace8ae157ea6f6cfd83b6870c665eb7817ad0f86e90bf3bb61a938668"
+  },
+  "slh/system/attribution.py": {
+   "bytes": 12904,
+   "mode": "644",
+   "sha256": "6f368d71f4cc571806d917fab09fe13fca250845989f42fe1af00e3fe330554e"
+  },
+  "slh/system/ext_v3_db.py": {
+   "bytes": 1880,
+   "mode": "644",
+   "sha256": "f38acd42c33806c9b913624d0c5ccdfc6262a97022e76b891f5d0bc30ea120d4"
+  },
+  "slh/system/gate.py": {
+   "bytes": 17193,
+   "mode": "644",
+   "sha256": "3fcb53ffd58a1d5d1d8e265718716eced158a35076a4600dc59c91c29467cbdf"
+  },
+  "slh/system/guards.py": {
+   "bytes": 5753,
+   "mode": "644",
+   "sha256": "cbc3dedb77995cf6f41fc3b649f8b6d4026be824774b7df18813c0db21d057c6"
+  },
+  "slh/system/hosts/__init__.py": {
+   "bytes": 89,
+   "mode": "644",
+   "sha256": "3e002bb126bba3f79ce7903d1881206eaacdb4feb72f7b0c096ea5bcf7e94171"
+  },
+  "slh/system/hosts/hermes/__init__.py": {
+   "bytes": 65,
+   "mode": "644",
+   "sha256": "e8cd444a38b1a5431cb2839fbb8f03a17dbdb751ce8d124b2902ef7bd5566e0d"
+  },
+  "slh/system/hosts/hermes/adapter.py": {
+   "bytes": 32186,
+   "mode": "644",
+   "sha256": "9156e4d93c75fc540a436048936198b6672b96366bdafb57c2d7a0ca82a4459a"
+  },
+  "slh/system/hosts/hermes/bridge.py": {
+   "bytes": 11119,
+   "mode": "644",
+   "sha256": "1d3ffc8c95900449452191ab0525dbe22f777fc166449df795665847391814bf"
+  },
+  "slh/system/hosts/hermes/guard_host.py": {
+   "bytes": 2779,
+   "mode": "644",
+   "sha256": "9386bf7d031a137653793eca80b95d6019faad1224071fa969659122ca1032e1"
+  },
+  "slh/system/hosts/hermes/guard_rg.py": {
+   "bytes": 1565,
+   "mode": "644",
+   "sha256": "1894d632304f3844b61df166c1cdac0bd50310f6eb421ad673057a054a49c28b"
+  },
+  "slh/system/hosts/hermes/materialize.py": {
+   "bytes": 9726,
+   "mode": "644",
+   "sha256": "d45ed6ac2f68b368bd0fcc5e05cbcedc7f93be4ce461605fe1cd8da2f768ce3f"
+  },
+  "slh/system/hosts/hermes/meter.py": {
+   "bytes": 10107,
+   "mode": "644",
+   "sha256": "99810767091fab07f2a4389ab3fa38a1cf5d03bdbe750061fcf4fda89bf54846"
+  },
+  "slh/system/hosts/hermes/mh1.py": {
+   "bytes": 96419,
+   "mode": "644",
+   "sha256": "cf7488c31bbc05ed0b568e412861262c76cf4d572da2c7c9bcd9b1b74858a437"
+  },
+  "slh/system/hosts/hermes/mh1_package.json": {
+   "bytes": 231,
+   "mode": "644",
+   "sha256": "0fcac03759b58244d326bdcbcb7c01e15f647ac74e5681078107de98ddb23f1b"
+  },
+  "slh/system/hosts/hermes/plugin/__init__.py": {
+   "bytes": 4105,
+   "mode": "644",
+   "sha256": "856e5dba6132372c8a08dd92257afb6d41f67cfeb21ebaad7fe5f11f7b1dd295"
+  },
+  "slh/system/hosts/hermes/plugin/plugin.yaml": {
+   "bytes": 239,
+   "mode": "644",
+   "sha256": "4e1e81e4c3e9b14f0e856251438f21ad9d1bd25f1aae7e69bece1b980d50fba0"
+  },
+  "slh/system/hosts/hermes/proposer.py": {
+   "bytes": 10753,
+   "mode": "644",
+   "sha256": "d95564a65d13dc4d8d5f6159965aac68257980f0891daf8ffddb64d9b8ab6170"
+  },
+  "slh/system/hosts/hermes/rg.py": {
+   "bytes": 8787,
+   "mode": "644",
+   "sha256": "c4e0964e0b3455bb6203878b99e4f668f55464c32a84a02cbf8b77b48d3ffb4b"
+  },
+  "slh/system/hosts/hermes/runner.py": {
+   "bytes": 22815,
+   "mode": "644",
+   "sha256": "aa34ae06c17ecbb877da8375b26cee31bc9d95e66e202a55e6178d2a6b2de058"
+  },
+  "slh/system/hosts/hermes/sandbox.py": {
+   "bytes": 25249,
+   "mode": "644",
+   "sha256": "2da4d027a20a7cb7ac214537033876b761908c3888592a6e21333fd0f9712052"
+  },
+  "slh/system/hosts/hermes/stub_model.py": {
+   "bytes": 8618,
+   "mode": "644",
+   "sha256": "3c3c34fd5248c3ca4c582a9e27d5ef5e7e1ef6c03a57cdd82ddd90003ed79b34"
+  },
+  "slh/system/hosts/hermes/tau2_backend.py": {
+   "bytes": 50507,
+   "mode": "644",
+   "sha256": "049afd89b09c0e74469ea0372ce6d7c700405fca220d6a8f6dd883f476fbc593"
+  },
+  "slh/system/interfaces.py": {
+   "bytes": 15486,
+   "mode": "644",
+   "sha256": "8da59049a7ec54d0b456621fc1766fcc07a4798a5d47c4f4719cab8181df5950"
+  },
+  "slh/system/loop.py": {
+   "bytes": 91515,
+   "mode": "644",
+   "sha256": "f767a274a9f41d02777bf2f95c2eddb63b3f7f20edabce42c58351626f4ca84d"
+  },
+  "slh/system/replicate.py": {
+   "bytes": 5725,
+   "mode": "644",
+   "sha256": "dc83a670d6361b29fc37c48e6f18005e1e94acd4eb1b77a399fc873997fb1d82"
+  },
+  "slh/system/stats.py": {
+   "bytes": 6670,
+   "mode": "644",
+   "sha256": "3703c24b816b1029722b48ed6fa281969d18d963987fdd37cc4945ee9ce8f7e9"
+  },
+  "slh/system/stores.py": {
+   "bytes": 9700,
+   "mode": "644",
+   "sha256": "8de805ed2ab64b184a4f7e85a0f22e90cf0a140fe876305d52e62f311efa9b1d"
+  },
+  "slh/system/tau2.py": {
+   "bytes": 38589,
+   "mode": "644",
+   "sha256": "997017636ffc8f7cc54c0dc4e6c120a0be106d1eb360230f1fbe7842f2814c83"
+  },
   "slh/think_projection.py": {
    "bytes": 15847,
    "mode": "644",
@@ -439,70 +534,40 @@
    "mode": "644",
    "sha256": "cedc48b3667cc5a080dbc9d3fe987767c2fc961fc2a7c08eb508b0e369a38b9e"
   },
-  "slh/xp/alfworld/__init__.py": {
-   "bytes": 86,
+  "slh/xp/consent/__init__.py": {
+   "bytes": 776,
    "mode": "644",
-   "sha256": "efd132fb0e0349e2256ad234d21e6b668c1b75409e840e26c4f94b7a73412f26"
+   "sha256": "6c5fc675f13642c26b5459a7622f9b37cac117c1a9fe7819c673778831857d5e"
   },
-  "slh/xp/alfworld/check.py": {
-   "bytes": 3188,
+  "slh/xp/consent/metrics.py": {
+   "bytes": 46428,
    "mode": "644",
-   "sha256": "7ab5f34e630a58baeca133864584037791cb1a1ff94eb4c7d5e372ada108a7a9"
-  },
-  "slh/xp/alfworld/feasibility.py": {
-   "bytes": 22851,
-   "mode": "644",
-   "sha256": "6d5c419354b170b5cb71f21f9f96b5f8da83694c1a8941a2b748ca3f08cd2747"
-  },
-  "slh/xp/bfcl/__init__.py": {
-   "bytes": 0,
-   "mode": "644",
-   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  },
-  "slh/xp/bfcl/data.py": {
-   "bytes": 3916,
-   "mode": "644",
-   "sha256": "bf0f369e6c3e74c575872ee613160829234eab1b44678a2de664400cd1a4756c"
-  },
-  "slh/xp/bfcl/handler.py": {
-   "bytes": 12928,
-   "mode": "644",
-   "sha256": "910d895daf560423a5ac00f34330f173fd171cf90c9d64d13b489ac9fbc1c623"
-  },
-  "slh/xp/bfcl/plan.py": {
-   "bytes": 23857,
-   "mode": "644",
-   "sha256": "e0872b44912cd18cdaa7340620ca09f645a1cff44fe595451ef4362ec4f9726a"
-  },
-  "slh/xp/bfcl/runner.py": {
-   "bytes": 39522,
-   "mode": "644",
-   "sha256": "c887e4fa472c4d1d4d9e365952951bdda4b77196d4139323f751ea2d74f8226a"
-  },
-  "slh/xp/bfcl/splits.py": {
-   "bytes": 14327,
-   "mode": "644",
-   "sha256": "4c0eda9f34e0d91330792a5a9843adacd9bc4a2e21cb9b2d1d29585d65761f30"
-  },
-  "slh/xp/bfcl/traces.py": {
-   "bytes": 7859,
-   "mode": "644",
-   "sha256": "2707f911373915020a41027177683d182d2c603af7ffabc359d6d30e866c3ff7"
-  },
-  "slh/xp/bfcl/vendor.py": {
-   "bytes": 9016,
-   "mode": "644",
-   "sha256": "53e254f4e82941eb7f1017243a2966f0e9986c554ca130de385d9d1c340b8d82"
+   "sha256": "af09c3a78dd526ac791d3e0567930edd33972731bbfa5b10f51b24dfe87fc998"
   },
   "slh/xp/fgate/__init__.py": {
    "bytes": 565,
    "mode": "644",
    "sha256": "08bf4d4b6df1886f18c548711d0905ffb3532c6ce2ec3f3a6829cff313d33420"
   },
-  "slh/xp/fgate/units.py": {
-   "bytes": 20266,
+  "slh/xp/fgate/analysis.py": {
+   "bytes": 40949,
    "mode": "644",
-   "sha256": "e9009cdbeaf10591a64a9fc9c3f09f9bef77a5b791ce8a2b1c02fbfa2cebc303"
+   "sha256": "3fab41cfd68e5ec8ef5b3834e925f16f3d4f1a43951c3921d774457875cf230a"
+  },
+  "slh/xp/fgate/design.py": {
+   "bytes": 26250,
+   "mode": "644",
+   "sha256": "357f7b669c30fcfe7e90307138c4f43158a572a969ccaf0f4462ff12f88078ec"
+  },
+  "slh/xp/fgate/pool.py": {
+   "bytes": 11875,
+   "mode": "644",
+   "sha256": "5d7875583f6bcb85676c3f188d19699f24ae11ab68239e8973230144f342f26d"
+  },
+  "slh/xp/fgate/units.py": {
+   "bytes": 25577,
+   "mode": "644",
+   "sha256": "9b08a0d8f5a7d656d873c59903be4b61b68f950d3d54fc4bb31573a9d5b44dc1"
   },
   "slh/xp/learn/__init__.py": {
    "bytes": 399,
@@ -529,11 +594,6 @@
    "mode": "644",
    "sha256": "94b962f7615f3670036915ec3187d1fa2c33f179b6eceb47ed73e0bd116d3a96"
   },
-  "slh/xp/partner/check.py": {
-   "bytes": 48454,
-   "mode": "644",
-   "sha256": "a5a3e6791f0bb2ba26f7e1ca280e21632461084e26607b985b6c6bc14691931b"
-  },
   "slh/xp/partner/common.py": {
    "bytes": 16555,
    "mode": "644",
@@ -554,35 +614,15 @@
    "mode": "644",
    "sha256": "88ac41e24e4021e4090c505d0e2967d28eeecb8f4cc6811a6c18e5e033c4afce"
   },
-  "slh/xp/partner/estimate.py": {
-   "bytes": 14027,
-   "mode": "644",
-   "sha256": "5bef3f4d39f0f6104e0d8b1b348585f74be7c2980cd96a521e21e82cc72e443f"
-  },
   "slh/xp/partner/export.py": {
    "bytes": 11743,
    "mode": "644",
    "sha256": "0aabdfd9de7843b41804bafd69e9fc695cc23d6e2030440112a7d12537216a96"
   },
-  "slh/xp/partner/gate.py": {
-   "bytes": 39559,
-   "mode": "644",
-   "sha256": "04465093c925ae60622a965879be6fd2b7a01680268603786811a9d65c9019dc"
-  },
   "slh/xp/partner/learners.py": {
    "bytes": 42528,
    "mode": "644",
    "sha256": "f5a23858b72f2c2d279dff77cd3b2167fbfc34fa598ad65106958c8d399fc348"
-  },
-  "slh/xp/partner/offline.py": {
-   "bytes": 32224,
-   "mode": "644",
-   "sha256": "d70715b8a9dd7f1f2bc656259509c698fa1575ce326557ba42ffa3771019ff80"
-  },
-  "slh/xp/partner/phase1_registration.py": {
-   "bytes": 32359,
-   "mode": "644",
-   "sha256": "c15acaf5d85aa43d7779736173358fe2080a2dc55b897bf73034edc96d1bb808"
   },
   "slh/xp/partner/plan.py": {
    "bytes": 34109,
@@ -590,24 +630,29 @@
    "sha256": "4b355b0059e32b8412c6352020e883702729a419c7cd0d6d368ffe31423656ba"
   },
   "slh/xp/partner/runner.py": {
-   "bytes": 45215,
+   "bytes": 45661,
    "mode": "644",
-   "sha256": "65c4e38a8480851673c8d3b2b63b9a2a4fb402e530568a2c11d1bcd23968f672"
+   "sha256": "c1a0a7ac201f97d6a1d3ce4b8a8ccd5ca1e7319f1191a67b950769ea92aeaf7e"
   },
   "slh/xp/partner/schemas.py": {
    "bytes": 11453,
    "mode": "644",
    "sha256": "419be0f60b6358ab56231d19910af989c725c16c7ba21f142c7c54f531196dfc"
   },
-  "slh/xp/partner/secret.py": {
-   "bytes": 2549,
-   "mode": "644",
-   "sha256": "2d1f77ad4dba26a2c7c7843548accfeed56db82c824437d9509305505c0258c7"
-  },
   "slh/xp/partner/vendor.py": {
    "bytes": 2498,
    "mode": "644",
    "sha256": "bc93414e42b582d6040005871e59a7b6fe24f09c872a65368fc72fec2a6cc83a"
+  },
+  "slh/xp/partner_c/__init__.py": {
+   "bytes": 640,
+   "mode": "644",
+   "sha256": "9ceb4d20f4a50c1adcddb9394ce6704f6ee9a7391dfe09f5cd9d936807a0cacf"
+  },
+  "slh/xp/partner_c/train.py": {
+   "bytes": 24093,
+   "mode": "644",
+   "sha256": "088f5657508794e9957da3873068cb7f41f9333457cc3a8638dcaaed8afec8b7"
   },
   "slh/xp/phase2/__init__.py": {
    "bytes": 26412,
@@ -618,6 +663,11 @@
    "bytes": 7512,
    "mode": "644",
    "sha256": "bd2615c33a3f5bb5585c46445cc470ddc069f436caa7e6cd279937bac0abdebc"
+  },
+  "slh/xp/phase2/check.py": {
+   "bytes": 69430,
+   "mode": "644",
+   "sha256": "1e2092b878a81db00230c075db1f10aad98f512365eca2736668a437394bc093"
   },
   "slh/xp/phase2/export.py": {
    "bytes": 10779,
@@ -654,49 +704,32 @@
    "mode": "644",
    "sha256": "d1d8628c3fdd04847f669f44dfccd4b94b07e9444f1598c7adff1b5f1bc09243"
   },
-  "slh/xp/tasks/address.py": {
-   "bytes": 25452,
-   "mode": "644",
-   "sha256": "ca82ba1740d401f913ad2e623c4af9d837680f27ecaf8c537c74958128568b8e"
-  },
-  "slh/xp/tasks/cli.py": {
-   "bytes": 4399,
-   "mode": "644",
-   "sha256": "bb4775b7d7f7b83816c3c03e3ebbde3393f908706164abfddf7b17252858f668"
-  },
   "slh/xp/tasks/common.py": {
    "bytes": 19595,
    "mode": "644",
    "sha256": "f8a3bfde1a8d66f7c720e535ec42b644c9690a95d8380f5761daa65a47adbae0"
   },
-  "slh/xp/tasks/sequence.py": {
-   "bytes": 15835,
-   "mode": "644",
-   "sha256": "3068424f66a53bb2338f616b1beaec191c79010a75075bae508023cbc9e57014"
-  },
-  "slh/xp/tasks/variant.py": {
-   "bytes": 17941,
-   "mode": "644",
-   "sha256": "59c82a12f5bbb5a21b47a987852528c45b1e5fdecd0062bbb0e3f511a30d1d73"
-  },
   "slh/xp/validate.py": {
    "bytes": 16687,
    "mode": "644",
    "sha256": "293d324fb513d5fe7f9b217dbf9527d0c427c75b3767c830eba8ed05e7510b38"
-  },
-  "splits/bfcl.json": {
-   "bytes": 80601,
-   "mode": "644",
-   "sha256": "79b46790f8c5cb48b196fd5619eeb7c6dd0abf2f15da7eaf5cd1ab213c1dd28a"
   }
  },
  "kit_repo": "hopit-ai/self-learning-harness-kit",
  "phase1_package": false,
- "plan_id": "xp-h3b-2026-10-22",
+ "plan_id": "mh1-2026-10-24",
  "plan_sha256": null,
  "registration_sha256": null,
  "release": {
   "assets": {
+   "cpython-3.14.6+20260804-x86_64-unknown-linux-gnu-install_only.tar.gz": {
+    "bytes": 124756578,
+    "sha256": "8fa4614f8c2d47430d5573098fad787c44bb314830fd2e826952335446706e45"
+   },
+   "hermes-assets.sha256": {
+    "bytes": 245,
+    "sha256": "6f79b344895c2708b4fb69d0dbaf328a0aa60e7fc1dd4d369149889216e72af5"
+   },
    "offline-assets.json": {
     "bytes": 500,
     "sha256": "7cea783c97db18bc98f4693d7c125decbf1d1da84f0233c16bf0e6901e168514"
@@ -705,83 +738,35 @@
     "bytes": 165984479,
     "sha256": "a65736d75b1f5cc712c3e068704c64ca7fd4592d0e7cc94248ef45f1c05afd76"
    },
-   "wheelhouse-bfcl-linux-x86_64-py312.tar.gz": {
-    "bytes": 106569207,
-    "sha256": "5cd8aed9d3c2a9e7d543bbc18f8b6051c7e6edffb8b2a92f3ba5950be8a8f34c"
-   },
-   "wheelhouse-bfcl.sha256": {
-    "bytes": 108,
-    "sha256": "c78e63ccaef9e63566376dfbe8cc3cf1357c77e5e5f4ebd891bcc0e308aaa32d"
+   "wheelhouse-hermes-linux-x86_64-py314.tar.gz": {
+    "bytes": 45831063,
+    "sha256": "ce5e424e74d77aa1fd112cce2ae2bc958cc774ff2a9fcb472d0e3c2b13b0fc8b"
    },
    "wheelhouse-linux-x86_64-py312.tar.gz": {
     "bytes": 67497161,
     "sha256": "d67df2fa5518996ff5a5f74db92f27bfa1b800b73e744421882ced5b5405021e"
    }
   },
-  "handoff": "Hand-off 3 (function-calling benchmark)",
+  "handoff": "Hand-off: Hermes Agent on the retail benchmark",
   "kit_repo": "hopit-ai/self-learning-harness-kit",
-  "packages": {
-   "package-bfcl-h3": {
-    "arms": [
-     "B1",
-     "B1P",
-     "MEMORY",
-     "PERSON",
-     "SEARCH",
-     "UNGATED"
-    ],
-    "cells": 24,
-    "decoding": {
-     "name": "sampled",
-     "sampling": {
-      "top_p": 0.8
-     },
-     "temperature": 0.7
-    },
-    "empty_arms": [
-     "FPRIME"
-    ],
-    "episodes": 5760,
-    "libraries": {
-     "B1P": "13a18555997fba1ef8afa9b9928b479a5992ac25a116ae38f9f146b56a325266",
-     "FPRIME": "0fa53bd8d19ee8639a77654c8dba2ea9af521132166454eed32b6e1e916e5f19",
-     "MEMORY": "a3394317efd5a1fd97a50dc0bde57ec156117b5de9876e09d0e090b41bd2508a",
-     "PERSON": "622cd48d14d3dd035c17ca02613084bace88fb83043a1328cf4a6722f8da037a",
-     "SEARCH": "a6d4eefc09107d630fe2d9e85e7d1459a3ab037394a9fa15f1d6bf246d0a9685",
-     "UNGATED": "d4a5b8bec6f23d16f37da91f020106ba8b4dddca58cd3746247a0c5dfeea24c8"
-    },
-    "plan_sha256": "254044ee0f62c28a666ee573a13b1a596b022ddfedc84f376249565997e4b680",
-    "what": "part E: function-calling benchmark, confirmation on the held-out test split (frozen libraries, 4 trials)"
-   },
-   "package-bfcl-h3-official": {
-    "cells": 1,
-    "decoding": {
-     "name": "official",
-     "sampling": {},
-     "temperature": 0.001
-    },
-    "episodes": 240,
-    "plan_sha256": "dbadc59e509d5afca6172859d11e43eb724839dfff2f87f66c6d56e54ef81216",
-    "what": "part E: one descriptive standard-harness trial on the test split at the official temperature"
-   }
-  },
+  "packages": {},
   "part_names": {
-   "E": "function-calling benchmark: confirmation on the held-out test split"
+   "H": "Hermes Agent on the retail benchmark: three learning setups, two customer models (code only; task data handed over privately)"
   },
   "parts": [
-   "E"
+   "H"
   ],
   "phase1_package": false,
   "rehearsal": false,
-  "runbook": "docs/xp/handoff3-bfcl-runbook.md",
+  "runbook": "docs/xp/handoff-mh1-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "xp-h3b-v1"
+  "tag": "mh1-2026-10-24-v1"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "xp-h3b-v1"
+  "phase1": "mh1-2026-10-24-v1"
  },
- "total_bytes": 3611450,
+ "total_bytes": 2525391,
  "variant": "plain"
 }
