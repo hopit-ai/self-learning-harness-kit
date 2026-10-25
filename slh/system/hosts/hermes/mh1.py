@@ -72,7 +72,7 @@ from typing import Any
 from slh.system.hosts.hermes.errors import HaltError, IncidentError, RefusedError
 
 PLAN_SCHEMA = "slh-mh1-plan-v1"
-PLAN_ID = "mh1-2026-10-25-v2"  # v1: mh1-2026-10-24 (superseded, s. 14)
+PLAN_ID = "mh1-2026-10-25-v2.1"  # v2.1: setup and symlink fixes (s. 17); v1: mh1-2026-10-24
 PACKAGE_SCHEMA = "slh-mh1-package-v1"
 EXPORT_SCHEMA = "slh-mh1-export-v1"
 REPO = Path(__file__).resolve().parents[4]

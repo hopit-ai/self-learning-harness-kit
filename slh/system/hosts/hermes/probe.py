@@ -1557,7 +1557,8 @@ def review_rows(run_dir: Path, *, audit_rate: float = 0.2) -> list[dict[str, Any
                     bump(rid, "adopted")
 
     def row(arm: str, batch: Any, unit: str, trace_or_row: Mapping[str, Any],
-            staged: Sequence[Mapping[str, Any]], seen: set[str]) -> dict[str, Any]:
+            staged: Sequence[Mapping[str, Any]], seen: set[str],
+            episode: Mapping[str, Any]) -> dict[str, Any]:
         usage = trace_or_row.get("usage") or {}
         shas = [_rec_sha(x) for x in staged]
         kind = "empty" if not staged else ("duplicate" if all(s in seen for s in shas)
@@ -1577,7 +1578,11 @@ def review_rows(run_dir: Path, *, audit_rate: float = 0.2) -> list[dict[str, Any
                 "kind": kind, "c_fate": best,
                 "survives": (best in ("screen_advance", "screen_hold", "confirm_hold",
                                       "adopted")) if arm == "C" else None,
-                "audit": _u("review-audit", arm, unit, batch) < audit_rate}
+                "audit": _u("review-audit", arm, unit, batch) < audit_rate,
+                # the finished episode the fork would review (known BEFORE the fork runs:
+                # inputs of the pre-registered skip rules 'no task write', 'episode
+                # success', 'short episode'); numbers only
+                **episode}
 
     seen_c: dict[Any, set[str]] = {}
     tp = sysd / "traces.jsonl"
@@ -1586,13 +1591,31 @@ def review_rows(run_dir: Path, *, audit_rate: float = 0.2) -> list[dict[str, Any
             continue
         tr = r.get("trace") or {}
         out.append(row("C", r.get("batch"), r.get("unit_id"), tr, tr.get("staged") or [],
-                       seen_c.setdefault(r.get("batch"), set())))
+                       seen_c.setdefault(r.get("batch"), set()),
+                       _episode_facts(r.get("status"), r.get("success"), tr.get("writes"),
+                                      sum(1 for m in tr.get("dialogue") or []
+                                          if m.get("role") == "user"),
+                                      tr.get("usage"))))
     for p in sorted((run_dir / "B").glob("evidence-*.jsonl")):
         seen: set[str] = set()
         k = int(p.stem.split("-")[1])
         for r in Jsonl(p).rows():
-            out.append(row("B", k, r.get("unit"), r, r.get("staged_records") or [], seen))
+            out.append(row("B", k, r.get("unit"), r, r.get("staged_records") or [], seen,
+                           _episode_facts(r.get("status"), r.get("success"), r.get("writes"),
+                                          r.get("acts"), r.get("usage"))))
     return out
+
+
+def _episode_facts(status: Any, success: Any, writes: Any, turns: Any, usage: Any
+                   ) -> dict[str, Any]:
+    """Episode facts for the review skip rules: status, success (None unless scored),
+    whether any task write was EXECUTED, customer turns (the dialogue's user turns, stop
+    turn included) and the main agent's tokens."""
+    u = usage or {}
+    return {"ep_status": status, "ep_success": success if status == "scored" else None,
+            "ep_task_write": bool(writes), "ep_turns": None if turns is None else int(turns),
+            "ep_tokens": [int(u.get("session_prompt_tokens") or 0),
+                          int(u.get("session_completion_tokens") or 0)]}
 
 
 # ============================================================================ export

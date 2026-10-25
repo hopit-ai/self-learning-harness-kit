@@ -205,6 +205,49 @@ def _check_bindable(p: Path) -> None:
             raise ValueError(f"refusing to expose {rp}: it contains the secret path {sp}")
 
 
+def symlink_chain(path: str | Path) -> list[tuple[str, str]]:
+    """The symlinks a path goes through, as ``(target, link)`` pairs, outermost first. The
+    binds are made at REAL paths, so every path the process uses unresolved (its argv, a
+    venv's interpreter symlink, ``pyvenv.cfg`` home, e.g. ``/home -> /storage/home`` on the
+    partner's nodes) gets the same links inside the namespace (``--symlink``)."""
+    out: list[tuple[str, str]] = []
+    p = os.path.normpath(os.path.abspath(str(path)))
+    seen: set[str] = set()
+    for _ in range(40):  # bounded: a symlink loop cannot hang the harness
+        parts = p.split(os.sep)
+        hit = None
+        for k in range(2, len(parts) + 1):
+            pre = os.sep.join(parts[:k]) or os.sep
+            if os.path.islink(pre):
+                hit = (pre, os.sep.join(parts[k:]))
+                break
+        if hit is None or hit[0] in seen:
+            break
+        link, rest = hit
+        seen.add(link)
+        target = os.readlink(link)
+        out.append((target, link))
+        real = os.path.realpath(link)
+        p = os.path.normpath(os.path.join(real, rest)) if rest else real
+    return out
+
+
+def _venv_links(p: str) -> list[str]:
+    """For an interpreter inside a venv: its symlink target and the ``home`` of its
+    ``pyvenv.cfg`` (both recorded UNRESOLVED by ``python -m venv``)."""
+    extra: list[str] = []
+    cfg = Path(p).parent.parent / "pyvenv.cfg"
+    if os.path.islink(p):
+        t = os.readlink(p)
+        extra.append(t if os.path.isabs(t) else os.path.join(os.path.dirname(p), t))
+    if cfg.exists():
+        for line in cfg.read_text(errors="replace").splitlines():
+            k, _, v = line.partition("=")
+            if k.strip() in ("home", "executable") and v.strip():
+                extra.append(v.strip())
+    return extra
+
+
 @dataclass(frozen=True)
 class LinuxSpec:
     """A bubblewrap invocation: binds only (see the module docstring)."""
@@ -256,6 +299,26 @@ class LinuxSpec:
             rp = os.path.realpath(p)
             if os.path.exists(rp):
                 a += ["--ro-bind", rp, rp]
+        # symlinked ancestors of every path used unresolved (argv, binds, venv links),
+        # recreated inside: the binds are at real paths (``symlink_chain``)
+        used = [c for c in cmd if isinstance(c, str) and os.path.isabs(c)]
+        used += [x for c in list(used) for x in _venv_links(c)]
+        links: dict[str, str] = {}
+        system = set(LINUX_SYSTEM_RO)
+        bound = [os.path.realpath(b) for b in (*self.readable, *self.writable,
+                                               *self.readonly)] + list(LINUX_SYSTEM_RO)
+
+        def exposed(d: str) -> bool:  # the directory is already visible through a bind
+            rd = os.path.realpath(d)
+            return any(rd == b or rd.startswith(b.rstrip("/") + "/") for b in bound)
+
+        for p in (*used, *self.readable, *self.writable, *self.readonly, str(cwd)):
+            for target, link in symlink_chain(p):
+                # a link inside a bound tree is already there (bound as it is on the host)
+                if link not in system and not exposed(os.path.dirname(link)):
+                    links.setdefault(link, target)
+        for link in sorted(links):
+            a += ["--symlink", links[link], link]
         a += ["--chdir", os.path.realpath(cwd), "--", *cmd]
         return a
 

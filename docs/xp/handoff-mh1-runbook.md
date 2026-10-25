@@ -1,10 +1,12 @@
 # Hand-off M-H1 runbook: Hermes Agent on the retail benchmark, three arms, two customer models
 
-**Version 2** (kit tag `mh1-2026-10-25-v2`, plan `mh1-2026-10-25-v2`). It replaces version
-1 (tag `mh1-2026-10-24-v1`). If you started version 1, stop it (Ctrl-C) and do not resume
-it; nothing from it is needed. Set version 2 up in a NEW directory with the version 2 task
-data (version 1's task data does not work with this kit: the kit checks the checksum).
-The steps are the same as in version 1.
+**Version 2.1** (kit tag `mh1-2026-10-25-v2.1`, plan `mh1-2026-10-25-v2.1`). It replaces
+version 2 (tag `mh1-2026-10-25-v2`), which nobody has run: two setup fixes (the Hermes
+environment installs the dependency set exactly as locked and then checks it; the sandbox
+now works when a path such as `/home` is a symlink, so no workaround is needed) and new
+task data pieces (the same tasks; the kit checks their checksum). Version 1 (tag
+`mh1-2026-10-24-v1`) is superseded too. Set up in a NEW directory. The three release
+assets are unchanged (reuse `assets-mh1/`).
 
 This file ships in the kit (`docs/xp/handoff-mh1-runbook.md`). The kit's `README.md` names
 the tag (a new tag of `hopit-ai/self-learning-harness-kit`; earlier tags are unchanged) and
@@ -59,7 +61,7 @@ Do not edit the package, the code or the run folders.
 ## 0. Setup (CPU only, no network on the compute node)
 
 **What you receive.** The kit at the new tag (code only; copy it to the node as it is),
-the version 2 task data in three pieces `package-mh1.tar.gz.part0`, `.part1`, `.part2` (at
+the version 2.1 task data in three pieces `package-mh1.tar.gz.part0`, `.part1`, `.part2` (at
 most 10 MB each) with `package-mh1.sha256`, handed to you privately by the owner (not on
 the release; please keep it private and do not publish it), and three release assets in
 one directory `assets-mh1/` next to the kit (the same three files as for version 1):
@@ -120,7 +122,11 @@ This one check exits 4 because Hermes is not set up yet; that is expected here (
 rules apply from the next preflight on). If the sandbox block is not ok, stop here and
 tell us (the kit has no unsandboxed mode).
 
-**Hermes environment** (ends with `{"ok": true, ...}`):
+**Hermes environment** (ends with `{"ok": true, ...}`). It installs the locked package
+set exactly as listed (no re-resolution), then runs `pip check`: it prints Hermes' own
+version overrides and accepts only the mismatch they explain (today one line,
+browser-harness asking for pillow 12.3.0 while Hermes pins Pillow 13.0.0); any other
+mismatch stops it (exit 4: tell us):
 
 ```bash
 scripts/xp/setup_hermes_offline.sh ../assets-mh1 $HERMES_CLONE $WORK/hermes-env 2>&1 | tee setup-hermes.log

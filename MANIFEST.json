@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "20c165662d90a807209efecd2e14bb72072e2b37",
-  "tree": "9dbda1b83dbe97b27ed9fd00fd0be0fa803fa0fd"
+  "commit": "9885cc4ff9689304c73673282b1d1f67feb58ec4",
+  "tree": "4b9c6bc334e4156c475572b0e81dcafa49973072"
  },
  "files": {
   ".gitignore": {
@@ -20,24 +20,29 @@
    "sha256": "94fd626be3e6a82b8e13d7ca92dfaef3fc7c770c30f7e7ec30fb92e71874fe72"
   },
   "README-plain.md": {
-   "bytes": 5556,
+   "bytes": 5558,
    "mode": "644",
-   "sha256": "2ae73e2aebb73ab18265be2c78bab81fb5b74929b43c5fac14f823fd892b3fd7"
+   "sha256": "5ec42a789e1fd6992069679cb5fbc289545f4989d3d8968cf6014620ec3a84d4"
   },
   "README.md": {
-   "bytes": 2201,
+   "bytes": 2207,
    "mode": "644",
-   "sha256": "207a85b598aad0774f7e1c9aba13bd8dc79e624246804b43c2af38afe4323b58"
+   "sha256": "c9adee1e331e2c9af9e86d5bbd083edd096716bc206af7a0ed99186976218966"
   },
   "docs/xp/handoff-mh1-runbook.md": {
-   "bytes": 14230,
+   "bytes": 14715,
    "mode": "644",
-   "sha256": "dba79ba74fc5ccef9f52f304dfb26a2409d9aaa622a2171c90305bd703fcc005"
+   "sha256": "d0764299c6c11d60dde511691bd7ee9401904a39b3564bf8f467212ef186297f"
   },
   "pyproject.toml": {
    "bytes": 1574,
    "mode": "644",
    "sha256": "e72fded78c3ba0de661fcc35093998391ffd6e630ff033db86e2bd1df205f75f"
+  },
+  "scripts/xp/hermes_pip_check.py": {
+   "bytes": 5545,
+   "mode": "644",
+   "sha256": "69c6ed0fc244631b78427e377ac8c7f19ac31a4e6252ee997094a2e6926e6c9e"
   },
   "scripts/xp/pack_export.sh": {
    "bytes": 3657,
@@ -45,9 +50,9 @@
    "sha256": "bb9031fe2c66fa348ce58338eed609fb0a4eea0eefd20af70ed8292e25a7f9be"
   },
   "scripts/xp/setup_hermes_offline.sh": {
-   "bytes": 2398,
+   "bytes": 3081,
    "mode": "755",
-   "sha256": "84789e9248e974dc29d59922fee87a594107e4954372755dfb2800260df5fb63"
+   "sha256": "b80ef44e839efa3f9768d480c144f61217df3e6947c54532a145728da491be40"
   },
   "slh/__init__.py": {
    "bytes": 380,
@@ -430,14 +435,14 @@
    "sha256": "99810767091fab07f2a4389ab3fa38a1cf5d03bdbe750061fcf4fda89bf54846"
   },
   "slh/system/hosts/hermes/mh1.py": {
-   "bytes": 136806,
+   "bytes": 136827,
    "mode": "644",
-   "sha256": "4dd685fde9b301daed49e7a64aeed547aaed0379d9403bba09181fa4aed6f7da"
+   "sha256": "29345da23f1199327f4beb85bfcdf88181128f3c46993d37df6b223ce816e7b8"
   },
   "slh/system/hosts/hermes/mh1_package.json": {
    "bytes": 231,
    "mode": "644",
-   "sha256": "a4acf74022dd9ee2adddfd9e1b03060c209725d3024ca10939f132a42b416729"
+   "sha256": "c7b15786eb68998965d511c13abe5c62fb2de5ca900949770c20c4d9496498cb"
   },
   "slh/system/hosts/hermes/plugin/__init__.py": {
    "bytes": 4105,
@@ -450,9 +455,9 @@
    "sha256": "4e1e81e4c3e9b14f0e856251438f21ad9d1bd25f1aae7e69bece1b980d50fba0"
   },
   "slh/system/hosts/hermes/probe.py": {
-   "bytes": 100967,
+   "bytes": 102424,
    "mode": "644",
-   "sha256": "a9d10ca997d48251ed6306b43cdb71debb42c91a12139c038a39307b7e67b5d9"
+   "sha256": "48e59b73bab1b5c4e7c4ac01c9a3c2b2e919b440e6644a24a8c17a06424440d7"
   },
   "slh/system/hosts/hermes/probe_arms.py": {
    "bytes": 17649,
@@ -485,9 +490,9 @@
    "sha256": "bacd9dee0dcaedaa30312d8c49cff5bebbc4f6080de8ad7bb7e1cfecdd2a3822"
   },
   "slh/system/hosts/hermes/sandbox.py": {
-   "bytes": 25249,
+   "bytes": 28269,
    "mode": "644",
-   "sha256": "2da4d027a20a7cb7ac214537033876b761908c3888592a6e21333fd0f9712052"
+   "sha256": "2a18f64b970026af9fa33cc7bfe3f8d5f511b289d38d8945d199413a612cd35d"
   },
   "slh/system/hosts/hermes/seal.py": {
    "bytes": 7075,
@@ -747,7 +752,7 @@
  },
  "kit_repo": "hopit-ai/self-learning-harness-kit",
  "phase1_package": false,
- "plan_id": "mh1-2026-10-25-v2",
+ "plan_id": "mh1-2026-10-25-v2.1",
  "plan_sha256": null,
  "registration_sha256": null,
  "release": {
@@ -790,13 +795,13 @@
   "rehearsal": false,
   "runbook": "docs/xp/handoff-mh1-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "mh1-2026-10-25-v2"
+  "tag": "mh1-2026-10-25-v2.1"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "mh1-2026-10-25-v2"
+  "phase1": "mh1-2026-10-25-v2.1"
  },
- "total_bytes": 2747836,
+ "total_bytes": 2759055,
  "variant": "plain"
 }
