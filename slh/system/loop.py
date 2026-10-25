@@ -117,9 +117,19 @@ SAFETY_KEYS = (
     "item_cap_usd", "lifetime_cap_usd", "monitor_level", "evidence_units",
     "critical_attribution_alpha", "critical_attribution_min_base",
     "hold_replicates", "hold_replicate_rule",
+    "critical_attribution_base_rule", "critical_attribution_min_base_rel",
+    "critical_attribution_min_base_floor", "screen_hold_review",
 )
-# values for systems started before a key existed, where the default would LOOSEN them
-LEGACY_SAFETY = {"hold_replicates": 0}  # replicate-on-discordance (2026-10-24) was off
+# values for systems started before a key existed, where the default would change their
+# behaviour: replicate-on-discordance (2026-10-24) was off; the hard trigger's baseline rule
+# was absolute and a screen hard hold retired at look exhaustion (before 2026-10-25)
+LEGACY_SAFETY = {"hold_replicates": 0, "critical_attribution_base_rule": "absolute",
+                 "screen_hold_review": False}
+# keys that act only in the attributed screen: a difference is not a resume refusal while
+# neither the pinned nor the requested mode is ``attributed`` (switching to attributed is an
+# amendment, and the pinned values then apply)
+ATTRIBUTED_ONLY = ("critical_attribution_base_rule", "critical_attribution_min_base_rel",
+                   "critical_attribution_min_base_floor", "screen_hold_review")
 
 
 def _flat(config: dict[str, Any]) -> dict[str, Any]:
@@ -179,6 +189,10 @@ def _migrate(pinned: dict[str, Any], config: Mapping[str, Any]) -> dict[str, Any
 def safety_diff(pinned: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
     diff = {k: {"pinned": pinned.get(k), "requested": current.get(k)} for k in SAFETY_KEYS
             if pinned.get(k) != current.get(k)}
+    if "attributed" not in (pinned.get("critical_quarantine"),
+                            current.get("critical_quarantine")):
+        for k in ATTRIBUTED_ONLY:
+            diff.pop(k, None)
     if diff.get("production") == {"pinned": False, "requested": True}:
         diff.pop("production")  # switching production on only tightens
     return diff
@@ -457,6 +471,7 @@ def reconcile_reviews(audit: AuditLog) -> list[dict[str, Any]]:
                 out.append(audit.append(
                     "adjudication_void", adjudication_seq=r["seq"], k=k,
                     reason=f"interrupted approval not completed: {why}; re-decide"))
+    out += _reconcile_screen_reviews(audit)
     rows = audit.rows()
     bad = unreviewed_adoptions(rows)
     cur_v = _pointer(rows)
@@ -546,6 +561,175 @@ def _review_decide(root: Path, audit: AuditLog, k: int, decision: str, by: str, 
     return rec
 
 
+# ----------------------------------------------------------------- screen-hold review
+# (2026-10-25; owner: every hold ends in an audited human decision, never a silent
+# auto-release). A candidate HELD at the attributed screen that would advance (or whose
+# look budget is spent) is not advanced and not retired: ``Harness._screen_hold`` writes a
+# review packet ``reviews/screen-hold-s<h>.json`` and a ``screen_hold`` record (h allocated
+# from the records). A HUMAN decides with ``review_decide`` (target ``s<h>`` or a held
+# candidate id): ``approve`` (packet hash bound) lets the candidates go to a confirmation
+# in the next cycle, where the confirmation's own tests and its HOLD still apply;
+# ``reject`` retires them (retire records BEFORE the decision record). No automatic
+# release, ever; offline runs export the packets and the candidates stay where they are.
+
+SCREEN_PACKET_BINDING = ("h", "batch", "candidates", "incumbent")
+
+
+def screen_decisions(rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    """h -> the human decision in force on screen hold h (``screen_hold_adjudication`` by a
+    human, not voided). Anything else leaves the hold pending."""
+    void = {r["adjudication_seq"] for r in rows if r["kind"] == "adjudication_void"}
+    out: dict[int, dict[str, Any]] = {}
+    for r in rows:
+        if r["kind"] == "screen_hold_adjudication" and r["seq"] not in void and _is_human(r):
+            out.setdefault(r["h"], r)
+    return out
+
+
+def pending_screen_holds(rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    done = set(screen_decisions(rows))
+    return {r["h"]: r for r in rows if r["kind"] == "screen_hold" and r["h"] not in done}
+
+
+def screen_held_candidates(rows: list[dict[str, Any]]) -> set[str]:
+    """Candidates of screen holds awaiting a human decision."""
+    return {c for r in pending_screen_holds(rows).values() for c in r["candidates"]}
+
+
+def approved_screen_holds(rows: list[dict[str, Any]]
+                          ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """(hold, approval) of every APPROVED screen hold whose candidates have not yet entered
+    a confirmation (no ``confirm_open`` after the approval names any of them)."""
+    dec = screen_decisions(rows)
+    out = []
+    for r in rows:
+        if r["kind"] != "screen_hold" or r["h"] not in dec:
+            continue
+        rec = dec[r["h"]]
+        if DECISIONS[rec["decision"]] != "approve":
+            continue
+        used = any(o["kind"] == "confirm_open" and o["seq"] > rec["seq"]
+                   and set(o["candidates"]) & set(r["candidates"]) for o in rows)
+        if not used:
+            out.append((r, rec))
+    return out
+
+
+def current_screen_packet(rows: list[dict[str, Any]], h: int) -> dict[str, Any] | None:
+    out = None
+    for r in rows:
+        if r["kind"] == "screen_hold" and r["h"] == h:
+            out = {"packet": r["packet"], "packet_sha256": r["packet_sha256"]}
+    return out
+
+
+def _screen_packet_mismatch(root: Path, cur: dict[str, Any], hold: dict[str, Any]
+                            ) -> str | None:
+    """None when the packet file matches its recorded hash AND carries exactly the audited
+    hold's h, batch, candidates and incumbent."""
+    path = Path(root) / "reviews" / cur["packet"]
+    try:
+        data = path.read_bytes()
+        packet = json.loads(data)
+    except (OSError, ValueError):
+        return f"packet {cur['packet']} on disk is missing or unreadable"
+    if hashlib.sha256(data).hexdigest() != cur["packet_sha256"]:
+        return (f"packet {cur['packet']} on disk does not match its recorded hash (changed "
+                "or missing)")
+    bad = [f for f in SCREEN_PACKET_BINDING if not isinstance(packet, dict)
+           or f not in packet or packet[f] != hold[f]]
+    if bad:
+        return f"the reviewed packet does not match the audited screen hold on {bad}"
+    return None
+
+
+def _reconcile_screen_reviews(audit: AuditLog) -> list[dict[str, Any]]:
+    """Part of ``reconcile_reviews``: a ``screen_hold_adjudication`` not made by a human is
+    voided (the hold is pending again); an interrupted reject's retirements are completed.
+    An approval needs no completion (the next cycle confirms from the audit records)."""
+    out: list[dict[str, Any]] = []
+    rows = audit.rows()
+    void = {r["adjudication_seq"] for r in rows if r["kind"] == "adjudication_void"}
+    for r in rows:
+        if r["kind"] == "screen_hold_adjudication" and r["seq"] not in void \
+                and not _is_human(r):
+            out.append(audit.append(
+                "adjudication_void", adjudication_seq=r["seq"], h=r["h"],
+                reason=f"not a human decision ({r.get('decision')} by {r.get('by')!r}); the "
+                       "screen hold awaits human review"))
+    rows = audit.rows()
+    gone = _gone(rows)
+    for h, r in sorted(screen_decisions(rows).items()):
+        if DECISIONS[r["decision"]] != "reject":
+            continue
+        hold = next(x for x in rows if x["kind"] == "screen_hold" and x["h"] == h)
+        for cid in hold["candidates"]:
+            if cid not in gone:
+                out.append(audit.append("retire", batch=hold["batch"], cid=cid,
+                                        stage="quarantine",
+                                        evidence={"screen_hold": h, "adjudicated_by": r["by"],
+                                                  "completed": "reconcile"}))
+                gone.add(cid)
+    return out
+
+
+def _screen_decide(root: Path, audit: AuditLog, h: int, decision: str, by: str, note: str,
+                   packet_sha256: str | None) -> dict[str, Any]:
+    """Caller holds the writer lock. As ``_review_decide`` for a SCREEN hold: the chain must
+    verify; ``approve`` needs the current packet hash (recorded = on disk), the packet bound
+    to the audited hold, no latched halt, the pointer still the hold's incumbent and no
+    candidate retired or dropped; it ADVANCES the candidates to a confirmation in the next
+    cycle (never an adoption by itself). ``reject`` retires them BEFORE its record."""
+    if decision not in DECISIONS:
+        raise ReviewRefused(f"decision is one of {sorted(DECISIONS)}")
+    decision = DECISIONS[decision]
+    if not str(by).strip() or not str(note).strip():
+        raise ReviewRefused("a reviewer name and a note are required")
+    if str(by).strip() in NOT_A_REVIEWER:
+        raise ReviewRefused(f"{by!r} is not a human reviewer")
+    _verified(audit)
+    reconcile_reviews(audit)
+    rows = audit.rows()
+    hold = next((r for r in rows if r["kind"] == "screen_hold" and r["h"] == h), None)
+    if hold is None:
+        raise ReviewRefused(f"no screen hold s{h}")
+    if h in screen_decisions(rows):
+        raise ReviewRefused(f"screen hold s{h} already decided")
+    cur = current_screen_packet(rows, h)
+    assert cur is not None
+    path = Path(root) / "reviews" / cur["packet"]
+    on_disk = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+    if decision == "approve" or packet_sha256 is not None:
+        if packet_sha256 != cur["packet_sha256"]:
+            raise ReviewRefused(f"packet hash mismatch: the current packet of s{h} is "
+                                f"{cur['packet']} sha256 {cur['packet_sha256']}; review it")
+        if on_disk != cur["packet_sha256"]:
+            raise ReviewRefused(f"packet {cur['packet']} on disk does not match its recorded "
+                                "hash (changed or missing): refusing")
+    gone = _gone(rows)
+    if decision == "approve":
+        halt = _halt(rows)
+        if halt is not None:
+            raise ReviewRefused(f"system halt latched ({halt['reason']}): ack it first")
+        bad = _screen_packet_mismatch(root, cur, hold)
+        if bad:
+            raise ReviewRefused(f"{bad}: refusing")
+        if _pointer(rows) != hold["incumbent"]:
+            raise ReviewRefused("the pointer moved since the screen hold (its incumbent is not "
+                                "current): the screen evidence no longer applies; reject it")
+        if set(hold["candidates"]) & gone:
+            raise ReviewRefused("a candidate of the hold was retired or dropped")
+    if decision == "reject":
+        for cid in hold["candidates"]:
+            if cid not in gone:
+                audit.append("retire", batch=hold["batch"], cid=cid, stage="quarantine",
+                             evidence={"screen_hold": h, "adjudicated_by": by})
+    return audit.append("screen_hold_adjudication", h=h, decision=decision, by=by,
+                        note=note, candidates=hold["candidates"], packet=cur["packet"],
+                        packet_sha256=cur["packet_sha256"],
+                        advance=decision == "approve", incumbent=hold["incumbent"])
+
+
 def review_decide(root: Path, target: str | int, decision: str, reviewer: str, note: str,
                   packet_sha256: str | None = None) -> dict[str, Any]:
     """CLI ``review-decide``: the human decision on a pending HOLD, under the writer lock.
@@ -561,14 +745,22 @@ def review_decide(root: Path, target: str | int, decision: str, reviewer: str, n
         rows = audit.rows()
         done = set(human_decisions(rows))
         pending = [r for r in rows if r["kind"] == "critical_hold" and r["k"] not in done]
+        if str(target).startswith("s") and str(target)[1:].isdigit():
+            return _screen_decide(root, audit, int(str(target)[1:]), decision, reviewer,
+                                  note, packet_sha256)
         if isinstance(target, int) or (str(target).startswith("k")
                                        and str(target)[1:].isdigit()):
             k = int(str(target).lstrip("k"))
         else:
-            hits = [r["k"] for r in pending if target in r["candidates"]]
+            hits = [("k", r["k"]) for r in pending if target in r["candidates"]] + \
+                [("s", h) for h, r in pending_screen_holds(rows).items()
+                 if target in r["candidates"]]
             if len(hits) != 1:
                 raise ReviewRefused(f"candidate {target!r} has {len(hits)} pending holds")
-            k = hits[0]
+            if hits[0][0] == "s":
+                return _screen_decide(root, audit, hits[0][1], decision, reviewer, note,
+                                      packet_sha256)
+            k = hits[0][1]
         return _review_decide(root, audit, k, decision, reviewer, note, packet_sha256)
     finally:
         lock.release()
@@ -590,6 +782,18 @@ class SystemConfig:
     critical_quarantine: str = "paired"  # paired | literal | attributed (s. 12; s. 18)
     critical_attribution_alpha: float = 0.05  # attributed mode: family-wise false quarantine
     critical_attribution_min_base: int = 100  # base runs per context for a "new failure"
+    # (2026-10-25) the hard trigger's baseline rule (``slh.system.attribution``): "relative"
+    # = a kind observed in the context's baseline is known at any baseline size; a NEW kind
+    # needs min(min_base, max(floor, ceil(rel x the candidate's runs in the context)))
+    # baseline runs; "absolute" (legacy) = min_base for every classification
+    critical_attribution_base_rule: str = "relative"
+    critical_attribution_min_base_rel: float = 1.5
+    critical_attribution_min_base_floor: int = 30
+    # (2026-10-25) a candidate HELD at the attributed screen that would advance (or whose
+    # look budget is spent) gets a review packet and waits for a HUMAN decision
+    # (``review_decide``: approve -> confirmation, which keeps its own HOLD; reject ->
+    # retired). False (legacy): it is carried and retired at look exhaustion.
+    screen_hold_review: bool = True
     # replication at the confirmation HOLD (s. 20): R repeated runs of the candidate and
     # every discordant reference per held unit, attached to the review packet as EVIDENCE.
     # Never releases (owner 2026-10-24: human review only). 0 = off (the default).
@@ -630,6 +834,8 @@ class Harness:
             raise ValueError(f"critical_quarantine must be one of {CRITICAL_MODES}")
         if self.cfg.monitor_level not in LEVELS:
             raise ValueError(f"monitor_level must be one of {LEVELS}")
+        if self.cfg.critical_attribution_base_rule not in ("absolute", "relative"):
+            raise ValueError("critical_attribution_base_rule must be 'absolute' or 'relative'")
         paid = bool(adapter.info().paid)
         metered = self.metered_components(adapter, proposer)
         if metered and self.cfg.item_cap_usd is None:
@@ -1086,8 +1292,27 @@ class Harness:
         return out
 
     def held(self) -> set[str]:
-        """Candidates of confirmation HOLDs without a human review decision."""
-        return held_candidates(self.audit.rows())
+        """Candidates of confirmation HOLDs and of SCREEN holds without a human review
+        decision."""
+        rows = self.audit.rows()
+        return held_candidates(rows) | screen_held_candidates(rows)
+
+    def screen_reserved(self) -> set[str]:
+        """Candidates under screen-hold review: pending, or approved and not yet in a
+        confirmation. They are neither screened again nor re-proposed."""
+        rows = self.audit.rows()
+        return screen_held_candidates(rows) | {
+            c for hold, _ in approved_screen_holds(rows) for c in hold["candidates"]}
+
+    def adjudicate_screen_hold(self, h: int, decision: str, by: str, note: str,
+                               packet_sha256: str | None = None) -> dict[str, Any]:
+        """Human review of screen hold ``h`` (``review_decide`` target ``s<h>``): approve
+        (needs the current packet hash; the next cycle confirms the candidates) or reject
+        (retired)."""
+        rec = _screen_decide(self.root, self.audit, h, decision, by, note, packet_sha256)
+        gone = self.retired() | self.held()
+        self.carry["pool"] = [d for d in self.carry["pool"] if d["cid"] not in gone]
+        return rec
 
     def released_holds(self) -> set[str]:
         """Candidates whose hold a reviewer APPROVED (adopted, or re-proposable when the
@@ -1231,17 +1456,17 @@ class Harness:
                            or self.cfg.screen.max_looks) for cid in ids}
         stat = AT.attribute(outs, ids, alpha=self.cfg.critical_attribution_alpha,
                             max_looks=frozen, prior=prior)
-        inc_v = inc.version_id
-        base = [self.traces.outcome(r) for r in self.traces.rows()
-                if r["config_version"] == inc_v and r["role"] in ("monitor", "evidence",
-                                                                  "screen")
-                and (r["role"] != "screen" or "1" not in str(r["tag"]))]
+        base = self._attribution_base(inc.version_id)
         before = {cid: self._hard_state(cid) for cid in ids}
         detail: dict[str, dict[str, list[str]]] = {}
+        report: dict[str, Any] = {}
         hard = AT.hard_trigger(outs, ids, base,
                                min_base=self.cfg.critical_attribution_min_base,
                                prior_kinds={c: h["kinds"] for c, h in before.items()},
-                               detail=detail)
+                               detail=detail, rule=self.cfg.critical_attribution_base_rule,
+                               min_base_rel=self.cfg.critical_attribution_min_base_rel,
+                               min_base_floor=self.cfg.critical_attribution_min_base_floor,
+                               report=report)
         state = {}
         for cid in ids:
             kinds = {**before[cid]["kinds"], **detail.get(cid, {})}
@@ -1260,10 +1485,16 @@ class Harness:
                           "max_looks": d["max_looks"], "hard": state[cid]}
         summary = {c: {k: v for k, v in d.items() if k not in ("d", "d_worst")}
                    for c, d in stat["candidates"].items()}
+        self._last_attr = {"batch": b, "summary": summary, "hard": hard, "state": state,
+                           "report": report}
         self.audit.append("critical_attribution", batch=b, candidates=_json(summary),
                           hard_trigger=_json(hard), quarantined=quarantined, held=held,
                           hard_state=_json({c: v for c, v in state.items()
-                                            if v["units"] or v["kinds"]}))
+                                            if v["units"] or v["kinds"]}),
+                          baseline=_json({k: report.get(k) for k in (
+                              "rule", "min_base", "min_base_rel", "min_base_floor",
+                              "base")}),
+                          events=_json((report.get("events") or [])[:200]))
         for cid in quarantined:
             self.audit.append("retire", batch=b, cid=cid, stage="quarantine",
                               evidence={"incident_stage": "screen", "rule": "attributed",
@@ -1292,6 +1523,102 @@ class Harness:
                 cur = kinds.setdefault(k, [])
                 cur += [x for x in v if x not in cur]
         return {"units": units, "kinds": kinds}
+
+    def _attribution_base(self, inc_v: str) -> list[Outcome]:
+        """The hard trigger's baseline: EVERY labelled run of the current setup ``inc_v``
+        recorded so far, of every earlier look and cycle: monitor and evidence runs, screen
+        anchors (no candidate bit) and the incumbent arms of confirmations (each an unbiased
+        draw of its role's units). Hold replicates are excluded (they are drawn on held
+        units only)."""
+        out = []
+        for r in self.traces.rows():
+            if r["config_version"] != inc_v:
+                continue
+            role, tag = r["role"], str(r["tag"])
+            if role in ("monitor", "evidence") or (role == "screen" and "1" not in tag) \
+                    or (role == "confirm" and tag == "incumbent"):
+                out.append(self.traces.outcome(r))
+        return out
+
+    def _screen_hold(self, b: int, inc: HarnessState, cands: list[Candidate],
+                     sd: dict[str, Any], outs: list[Outcome]) -> dict[str, Any]:
+        """A SCREEN hold (``screen_hold_review``): the review packet
+        ``reviews/screen-hold-s<h>.json`` (the screen decisions, the attribution test, the
+        persistent hard state, every held event with the candidate's and its bit-flip
+        partner's traces), then the ``screen_hold`` record. The candidates are neither
+        advanced nor retired; a HUMAN decides (``review_decide`` s<h>)."""
+        h = len(self.audit.rows("screen_hold")) + 1
+        ids = [c.cid for c in cands]
+        last = getattr(self, "_last_attr", None) or {}
+        # every candidate-only event of these candidates over their looks (the hold
+        # persists across looks), with both runs' traces from the trace store
+        evs = [e for r in self.audit.rows("critical_attribution")
+               for e in (r.get("events") or []) if e["candidate"] in ids]
+        want = {(e["unit"], t) for e in evs for t in (e["tag"], e.get("partner_tag"))}
+        by: dict[tuple[str, str], Outcome] = {(o.unit_id, o.tag): o for o in outs}
+        for r in self.traces.rows("screen"):
+            if (r["unit_id"], r["tag"]) in want and (r["unit_id"], r["tag"]) not in by:
+                by[(r["unit_id"], r["tag"])] = self.traces.outcome(r)
+        events = []
+        for e in evs:
+            a, pb = by.get((e["unit"], e["tag"])), by.get((e["unit"], e.get("partner_tag")))
+            events.append({**e, "candidate_trace": a.trace if a else None,
+                           "partner_trace": pb.trace if pb else None})
+        hard_state = {cid: self._hard_state(cid) for cid in ids}
+        packet = {"kind": "screen_hold", "h": h, "batch": b, "candidates": ids,
+                  "incumbent": inc.version_id, "candidate_meta": {c.cid: c.to_dict()
+                                                                  for c in cands},
+                  "screen": {cid: sd["decisions"][cid] for cid in ids},
+                  "attribution": {cid: (last.get("summary") or {}).get(cid) for cid in ids},
+                  "hard_state": hard_state,
+                  "baseline": {k: (last.get("report") or {}).get(k) for k in (
+                      "rule", "min_base", "min_base_rel", "min_base_floor", "base")},
+                  "events": events[:200], "events_total": len(events),
+                  "decision_options": {
+                      "approve": "the candidates go to a confirmation in the next cycle; its "
+                                 "own tests and its per-unit HOLD still apply",
+                      "reject": "the candidates are retired"},
+                  "auto_release": RP.NEVER}
+        name = f"screen-hold-s{h}.json"
+        sha = self._write_packet(name, packet)
+        self.audit.append("screen_hold", batch=b, h=h, candidates=ids,
+                          incumbent=inc.version_id, packet=name, packet_sha256=sha,
+                          units={cid: hard_state[cid]["units"] for cid in ids},
+                          meta={c.cid: c.to_dict() for c in cands},
+                          screen={cid: _json(sd["decisions"][cid]) for cid in ids})
+        self._alert("screen_hold", batch=b, h=h, candidates=ids)
+        return {"h": h, "candidates": ids, "packet": name}
+
+    def _released_screen_holds(self, b: int, inc: HarnessState
+                               ) -> tuple[list[Candidate], dict[str, Any], list[int]] | None:
+        """Human-APPROVED screen holds not yet confirmed: (candidates, their screen
+        decisions, hold ids) for a confirmation against ``inc``. An approval whose
+        incumbent is no longer current is void for confirmation: its candidates are retired
+        (the screen evidence was against another incumbent)."""
+        rows = self.audit.rows()
+        gone = _gone(rows)
+        adv: list[Candidate] = []
+        screen: dict[str, Any] = {}
+        hs: list[int] = []
+        for hold, rec in approved_screen_holds(rows):
+            live = [c for c in hold["candidates"] if c not in gone]
+            if not live:
+                continue
+            if hold["incumbent"] != inc.version_id:
+                for cid in live:
+                    self.audit.append("retire", batch=b, cid=cid, stage="screen_hold",
+                                      evidence={"screen_hold": hold["h"],
+                                                "approved_seq": rec["seq"],
+                                                "reason": "the incumbent changed after the "
+                                                          "approval"})
+                continue
+            hs.append(hold["h"])
+            for cid in live:
+                adv.append(Candidate.from_dict(hold["meta"][cid]))
+                screen[cid] = {**(hold.get("screen") or {}).get(cid, {}),
+                               "screen_hold": hold["h"], "approved_by": rec["by"],
+                               "adjudication_seq": rec["seq"]}
+        return (adv, screen, hs) if adv else None
 
     def _confirm_hold(self, outs: list[Outcome]) -> list[dict[str, Any]]:
         """CONFIRMATION policy, every quarantine mode: a candidate-only critical event (the
@@ -1356,9 +1683,11 @@ class Harness:
                      paid="proposer" in self.metered)
         self._propose_report(b)
         retired, pooled = self.retired(), {c["cid"] for c in self.carry["pool"]}
+        reserved = self.screen_reserved()
         new = []
         for c in cands:
             why = ("retired" if c.cid in retired else "already pooled" if c.cid in pooled
+                   else "under screen-hold review" if c.cid in reserved
                    else "duplicate in this proposal" if c.cid in {x.cid for x in new}
                    else None)
             if why:
@@ -1431,9 +1760,16 @@ class Harness:
                 return
             self.carry.pop("pending_confirm", None)
 
+        rel = self._released_screen_holds(b, inc)
+        if rel:  # human-approved screen holds: their confirmation first (no new screen)
+            adv, screen, hs = rel
+            summary["screen_hold_confirmation"] = hs
+            self._confirm_advanced(b, inc, adv, screen, summary)
+            return
+
         new = self._propose(b, inc)
         summary["proposed"] = len(new)
-        gone = self.retired()
+        gone = self.retired() | self.screen_reserved()
         pool = [Candidate.from_dict(d) for d in self.carry["pool"] if d["cid"] not in gone] + new
         # conflict exclusion (skill / memory post-states of one target): keep the first
         pool, clash = target_conflicts(pool)
@@ -1476,13 +1812,21 @@ class Harness:
         carry["meta"] = {k: v for k, v in carry["meta"].items() if k in live}
         sd = G.screen_decide(self._carry_rows(), pool, carry["meta"], carry["looks"],
                              self.cfg.screen)
+        review: list[str] = []
         for cid in held:  # HELD by attribution (a hard-trigger hold persists): never advanced
             d = sd["decisions"].get(cid)
             if not d:
                 continue
             spent = carry["crit_attr"].get(cid, {}).get("looks", 0) >= \
                 carry["crit_attr"].get(cid, {}).get("max_looks", self.cfg.screen.max_looks)
-            if spent:  # frozen look budget used up: no further test at unchanged alpha
+            if self.cfg.screen_hold_review and (d["decision"] == "advance" or (
+                    spent and d["decision"] == "carry")):
+                # the hold, not the screen, stops it: a HUMAN decides (packet below)
+                d["held"] = f"screen hold: human review (screen said {d['decision']})"
+                d["decision"] = "review"
+                sd["advanced"] = [x for x in sd["advanced"] if x != cid]
+                review.append(cid)
+            elif spent:  # legacy: frozen look budget used up, retired
                 d["decision"], d["held"] = "retire", "look budget spent"
                 sd["advanced"] = [x for x in sd["advanced"] if x != cid]
             elif d["decision"] == "advance":
@@ -1491,6 +1835,10 @@ class Harness:
         carry["pool"] = [c.to_dict() for c in pool
                          if sd["decisions"][c.cid]["decision"] == "carry"]
         summary["screen"] = {k: v["decision"] for k, v in sd["decisions"].items()}
+        if review:  # BEFORE the screen record: a crash in between never loses a candidate
+            summary["screen_hold"] = self._screen_hold(b, inc, [c for c in pool
+                                                                if c.cid in review],
+                                                       sd, souts)
         for cid, d in sd["decisions"].items():
             if d["decision"] == "retire":
                 self.audit.append("retire", batch=b, cid=cid, stage="screen", evidence=d)

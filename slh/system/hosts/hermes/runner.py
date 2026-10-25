@@ -329,6 +329,155 @@ def _wrap_review_fork() -> None:
     BR._run_review_fork = wrapped
 
 
+PROBE: dict = {"boundaries": 0, "applied": [], "errors": []}
+
+
+def _wire(messages: list) -> list:
+    """The conversation as the harness's probe sees it (no persistence fields)."""
+    out = []
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        c = m.get("content")
+        if isinstance(c, list):
+            c = " ".join(str(p.get("text", "")) for p in c if isinstance(p, dict))
+        w = {"role": m.get("role"), "content": None if c is None else str(c)}
+        if m.get("tool_call_id"):
+            w["tool_call_id"] = str(m["tool_call_id"])
+        if m.get("tool_calls"):
+            w["tool_calls"] = [{"id": str(tc.get("id") or ""),
+                                "name": str((tc.get("function") or {}).get("name") or ""),
+                                "arguments": str((tc.get("function") or {}).get("arguments")
+                                                 or "")}
+                               for tc in m["tool_calls"] if isinstance(tc, dict)]
+        out.append(w)
+    return out
+
+
+def _native_prune(agent, messages: list, min_chars: int, tail: int | None) -> list | None:
+    """Hermes' own deterministic tool-result prune passes on a COPY of ``messages``
+    (``ContextCompressor._prune_old_tool_results``): the content it would demote, as
+    ``[{"i", "content"}]``. ``tail`` None = Hermes' configured ``protect_last_n``."""
+    try:
+        cc = agent.context_compressor
+        n_tail = cc.protect_last_n if tail is None else int(tail)
+        pruned, _ = cc._prune_old_tool_results([dict(m) for m in messages],
+                                               protect_tail_count=n_tail,
+                                               protect_tail_tokens=None,
+                                               min_prune_chars=int(min_chars))
+        return [{"i": i, "content": str(p.get("content"))}
+                for i, (m, p) in enumerate(zip(messages, pruned, strict=False))
+                if isinstance(m, dict) and m.get("role") == "tool"
+                and p.get("content") != m.get("content")]
+    except Exception as e:  # noqa: BLE001 - recorded; the probe treats it as "no native"
+        PROBE["errors"].append(f"native: {e!r}"[:300])
+        return None
+
+
+def _ids(content: str) -> list:
+    """Identifiers in a tool result (stdlib mirror of ``probe.identifiers``, tested equal):
+    values of ``*_id``/``*_ids``/``id`` keys, payment-method keys, order numbers, a bare id
+    result; no cap."""
+    import re
+
+    found: list = []
+
+    def add(v):
+        v = str(v)
+        if v and v not in found:
+            found.append(v)
+
+    def walk(x, key=""):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                if re.search(r"(^|_)ids?$", str(k)):
+                    for y in (v if isinstance(v, list) else [v]):
+                        if isinstance(y, (str, int)):
+                            add(y)
+                if key.endswith("payment_methods"):
+                    add(k)
+                walk(v, str(k))
+        elif isinstance(x, list):
+            for y in x:
+                walk(y, key)
+
+    try:
+        walk(json.loads(content))
+    except (ValueError, TypeError):
+        pass
+    for m in re.findall(r"#W\d{7}", content or ""):
+        add(m)
+    bare = (content or "").strip().strip('"')
+    if not found and re.fullmatch(r"[A-Za-z0-9_]{3,64}", bare):
+        add(bare)
+    return found
+
+
+def _apply_edits(msgs: list, edits: list, b: int) -> None:
+    """Apply the harness's edits IN PLACE (the same list object Hermes holds). Refused (and
+    recorded, so the harness marks the branch invalid): an edit of anything but an existing
+    ``tool`` message, and any edit that drops an identifier of the original result, except
+    kind ``native`` (Hermes' own demotion text, a faithful record of the native policy) and
+    kinds ``inject*`` (an injected failure replaces an UNREAD pending result)."""
+    for e in edits:
+        i = int(e["i"])
+        if not (0 <= i < len(msgs) and isinstance(msgs[i], dict)
+                and msgs[i].get("role") == "tool"):
+            PROBE["errors"].append(f"edit refused at b{b}: index {i}")
+            continue
+        old = msgs[i].get("content")
+        old = old if isinstance(old, str) else json.dumps(old)
+        new = str(e["content"])
+        kind = str(e.get("kind", ""))
+        lost = ([] if kind == "native" or kind.startswith("inject")
+                else [x for x in _ids(old) if x not in new])
+        if lost:
+            PROBE["errors"].append(f"edit refused at b{b}: index {i} drops {len(lost)} "
+                                   "identifier(s)")
+            continue
+        msgs[i] = {**msgs[i], "content": new}
+        PROBE["applied"].append({"b": b, "i": i})
+
+
+def _install_boundary_hook(spec: dict) -> None:
+    """S1 headroom probe (docs/xp/s1-headroom-probe-design.md): at Hermes' own post-tool
+    compression boundary (``turn_tool_round.compress_after_tool_results``, where the
+    proactive tool-result prune runs) report the conversation to the harness and apply the
+    edits it returns (``_apply_edits``: only the CONTENT of existing ``tool`` messages; the
+    call message, its id and the call/result pairing are never touched; no non-native
+    edit may drop an identifier). Installed only for probe episodes (``ep["probe"]``);
+    never for the M-H1 arms."""
+    import agent.turn_tool_round as TTR
+
+    orig = TTR.compress_after_tool_results
+    lo = int(spec.get("native_min_chars", 400))
+
+    def wrapped(ag, *a, **k):
+        v = orig(ag, *a, **k)
+        if threading.current_thread() is not threading.main_thread():
+            return v  # a review fork's or helper's tool round: not the conversation
+        try:
+            msgs = v.messages
+            b = PROBE["boundaries"]
+            PROBE["boundaries"] += 1
+            pend = 0  # the pending round: tool results the model has not read yet
+            for m in reversed(msgs):
+                if isinstance(m, dict) and m.get("role") == "tool":
+                    pend += 1
+                else:
+                    break
+            dflt = getattr(ag.context_compressor, "proactive_prune_min_result_chars", 8000)
+            rep = bridge({"op": "boundary", "b": b, "messages": _wire(msgs),
+                          "native": _native_prune(ag, msgs, lo, pend),
+                          "native_default": _native_prune(ag, msgs, dflt, None)})
+            _apply_edits(msgs, rep.get("edits") or [], b)
+        except Exception as e:  # noqa: BLE001 - the harness marks the branch invalid
+            PROBE["errors"].append(f"boundary: {e!r}"[:300])
+        return v
+
+    TTR.compress_after_tool_results = wrapped
+
+
 def _usage(agent) -> dict:
     """Main-agent counters plus the review forks' (charged to the evidence run)."""
     keys = ("session_prompt_tokens", "session_completion_tokens", "session_total_tokens",
@@ -376,6 +525,8 @@ def run_episode(ep: dict) -> int:
     agent = None
     try:
         _wrap_review_fork()
+        if ep.get("probe"):
+            _install_boundary_hook(ep["probe"])
         agent = make_agent(ep)
         out["preflight"] = preflight(ep, agent)
         hello = bridge({"op": "hello", "attestation": out["attestation"],
@@ -445,6 +596,8 @@ def run_review(agent, history: list, join_s: float) -> dict:
 
 def _finish(ep: dict, out: dict, agent, code: int) -> int:
     out["fork_transcripts"] = FORK_TRANSCRIPTS
+    if ep.get("probe"):
+        out["probe"] = PROBE
     out["exit_code"] = code
     out["seconds"] = round(time.time() - T0, 3)
     if agent is not None and "usage" not in out:

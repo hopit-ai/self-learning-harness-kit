@@ -211,6 +211,9 @@ class HermesAdapter:
     record_dialogue: bool = False
     on_hello: Callable[..., None] | None = None  # test fault injection
     pre_launch: Callable[[Path, RunRequest], None] | None = None  # test fault injection
+    # S1 headroom probe (``probe.ProbeHooks``): record / forced-prefix replay of probe
+    # episodes by tag. None in every M-H1 arm: the run path is then unchanged.
+    probe: Any = None
     runs: list[dict[str, Any]] = field(default_factory=list)  # per-run diagnostics
 
     def __post_init__(self) -> None:
@@ -352,13 +355,17 @@ class HermesAdapter:
         determinism_ok = man == expected
         mat_sha = MZ.materialization_sha256(expected)
         session = self.surface.new_session(unit)
+        ph = self.probe.begin(r, session) if self.probe is not None else None
         tools_file = root / "tools.json"
         tools_file.write_text(json.dumps(self.surface.tool_schemas))
         broker = Broker(session, role=unit.role, task_tools=set(self.surface.task_tools),
                         surface_guard=self.surface.surface_guard,
-                        expected_materialization=mat_sha, on_hello=self.on_hello)
+                        expected_materialization=mat_sha, on_hello=self.on_hello,
+                        on_boundary=ph.on_boundary if ph is not None else None)
         nonce = uuid.uuid4().hex[:12]
-        gate = self.model.gate().start()  # the only way to the model: a hard token ceiling
+        # the only way to the model: a hard token ceiling (a probe episode's gate is the same
+        # SpendGate that also records, or replays a recorded prefix of, the agent's calls)
+        gate = (ph.gate(self.model) if ph is not None else self.model.gate()).start()
         ep = {"mode": "episode", "role": unit.role, "tag": r.tag, "unit_id": unit.unit_id,
               "manifest": expected, "allowed_tools": self._allowed_tools(unit.role),
               "toolsets": self._toolsets(unit.role),
@@ -373,6 +380,8 @@ class HermesAdapter:
               "session_id": f"slh-{_sha(unit.unit_id + r.tag)[:12]}",
               "hermes_clone": str(self.host.clone.resolve()), "hermes_sha": self.host.sha,
               "system_preamble": self.system_preamble}
+        if ph is not None:
+            ep["probe"] = ph.runner_spec()
         ep_file = root / "episode.json"
         ep_file.write_text(json.dumps(ep))
         if self.pre_launch is not None:
@@ -427,6 +436,8 @@ class HermesAdapter:
                                else None}
                               for w in getattr(session, "executed_writes", [])]
             diag["dialogue"] = [dict(m) for m in getattr(session, "transcript", [])]
+        if ph is not None:
+            diag["probe"] = ph.finish(res, gate)
         self.runs.append(diag)
         return self._outcome(r, res, done, post, staged, broker, session, determinism_ok,
                              mat_sha, diag, gate)
@@ -528,6 +539,7 @@ class HermesAdapter:
             notes.append(f"spend gate refused {len(gate.refused)} request(s)")
         cost = model_cost + float(getattr(session, "cost_usd", 0.0) or 0.0)
         applied = state.content_sha256 if attested else f"unattested:{mat_sha}"
+        kinds = critical_kinds(session, critical)
         trace: dict[str, Any] = {
             "host": "hermes", "materialization_sha256": mat_sha,
             "attested": attested, "post_hash_ok": post["ok"], "incident_reasons": reasons,
@@ -540,7 +552,12 @@ class HermesAdapter:
                               else None),
             "preflight": res.get("preflight"), "canaries": res.get("canaries"),
             "spend_gate": gate.report() if gate is not None else None,
-            "guard_records": len(broker.mediation)}
+            "guard_records": len(broker.mediation),
+            # the semantic violation kind of a critical run (its first unconsented executed
+            # write; ``Tau2Session.violation_of``): the attributed screen's hard trigger
+            # classifies by it, and a kind-less critical event can only HOLD (v1-design s. 19)
+            "violation": kinds[0] if critical is True and kinds else None,
+            "violation_kinds": kinds if critical is True else []}
         if unit.role == "evidence":
             trace.update({"messages": res.get("messages"), "fork": res.get("fork_transcripts"),
                           "sharegpt": res.get("sharegpt"), **session.learner_view(),
@@ -556,6 +573,16 @@ class HermesAdapter:
 
 
 # ---------------------------------------------------------------------- helpers
+
+
+def critical_kinds(session: Any, critical: bool | None) -> list[str]:
+    """The semantic violation kinds of a CRITICAL run (``critical is True``), in execution
+    order, from the surface session's ground truth (``Tau2Session.violation_kinds``); empty
+    for a non-critical or unresolved run, or a surface without kinds (its critical events
+    then stay kind-less, and the attributed screen HOLDS them)."""
+    if critical is not True or not hasattr(session, "violation_kinds"):
+        return []
+    return [str(k) for k in session.violation_kinds()]
 
 
 def _read_json(p: Path) -> dict[str, Any] | None:

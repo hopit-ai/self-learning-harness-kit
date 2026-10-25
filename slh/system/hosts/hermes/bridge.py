@@ -11,7 +11,9 @@ The broker is where mediation happens and is recorded:
   the fail-closed backstop);
 * ``hello``: the runner's attestation; the broker refuses a run whose materialisation hash
   or preflight does not match;
-* ``first_user`` / ``user_turn``: the dialogue (task prompt, or a customer simulator).
+* ``first_user`` / ``user_turn``: the dialogue (task prompt, or a customer simulator);
+* ``boundary`` (S1 headroom probe episodes only): the conversation at Hermes' post-tool
+  compression boundary; the probe answers with content edits of tool messages.
 """
 
 from __future__ import annotations
@@ -46,8 +48,13 @@ class Broker:
     def __init__(self, session: Any, *, role: str, task_tools: set[str],
                  surface_guard: Callable[..., tuple[bool, str, dict[str, Any]]],
                  expected_materialization: str,
-                 on_hello: Callable[[Broker, Mapping[str, Any]], None] | None = None) -> None:
+                 on_hello: Callable[[Broker, Mapping[str, Any]], None] | None = None,
+                 on_boundary: Callable[[Mapping[str, Any]], dict[str, Any]] | None = None
+                 ) -> None:
         self.session = session
+        # S1 headroom probe only (``probe.py``): the runner's post-tool boundary report;
+        # None in every M-H1 arm (the op is then unknown)
+        self.on_boundary = on_boundary
         self.role = role
         self.task_tools = frozenset(task_tools)
         self.surface_guard = surface_guard
@@ -79,6 +86,8 @@ class Broker:
                 return self._tool(msg)
             if op == "hello":
                 return self._hello(msg)
+            if op == "boundary" and self.on_boundary is not None:
+                return self.on_boundary(msg)
         return {"error": f"unknown op {op!r}"}
 
     def _turn(self, op: str, msg: Mapping[str, Any]) -> dict[str, Any]:

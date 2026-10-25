@@ -1,5 +1,11 @@
 # Hand-off M-H1 runbook: Hermes Agent on the retail benchmark, three arms, two customer models
 
+**Version 2** (kit tag `mh1-2026-10-25-v2`, plan `mh1-2026-10-25-v2`). It replaces version
+1 (tag `mh1-2026-10-24-v1`). If you started version 1, stop it (Ctrl-C) and do not resume
+it; nothing from it is needed. Set version 2 up in a NEW directory with the version 2 task
+data (version 1's task data does not work with this kit: the kit checks the checksum).
+The steps are the same as in version 1.
+
 This file ships in the kit (`docs/xp/handoff-mh1-runbook.md`). The kit's `README.md` names
 the tag (a new tag of `hopit-ai/self-learning-harness-kit`; earlier tags are unchanged) and
 the SHA-256 of the package and of every offline asset; `MANIFEST.json` lists the same.
@@ -16,13 +22,18 @@ through a local socket). What runs:
 - **Three arms per block:** plain Hermes; Hermes learning skills and memories on its own;
   Hermes learning through our gate. Then all three are evaluated on 3,000 held-out
   conversations.
+- **A small extra measurement, block `c9b` only** (in the same command, after everything
+  above): plain Hermes conversations that are recorded and then continued a few different
+  ways from the same point (how much of the earlier context the agent needs, and how it
+  should react to a failed lookup). Nothing for you to do; it adds a few hours to the
+  `c9b` run.
 
 | Step | GPUs | Expected time | Python |
 |---|---|---|---|
 | 0. Setup and checks | none | 30–45 min | kit env (3.12) + Hermes env (3.14, from the assets) |
 | 1. Servers | 8 (4 for the 9B, 4 for the 27B) | start-up | your vLLM 0.30.0 env |
 | 2. Smoke runs (both blocks) | as above | 15–30 min | kit env |
-| 3. Full runs (both blocks at the same time) | as above | about 1 day (planning figure: 70–190 H100-hours in total) | kit env |
+| 3. Full runs (both blocks at the same time) | as above | about 1 day (planning figure: 76–242 H100-hours in total) | kit env |
 | 4. Export and pack | none | minutes | kit env |
 
 **There is no time or GPU-hour limit: run both blocks to completion.** The smoke run prints
@@ -48,10 +59,10 @@ Do not edit the package, the code or the run folders.
 ## 0. Setup (CPU only, no network on the compute node)
 
 **What you receive.** The kit at the new tag (code only; copy it to the node as it is),
-the task data in three pieces `package-mh1.tar.gz.part0`, `.part1`, `.part2` (at most
-10 MB each) with `package-mh1.sha256`, handed to you directly by the owner (not on the
-release; please keep it private and do not publish it), and three release assets in one
-directory `assets-mh1/` next to the kit:
+the version 2 task data in three pieces `package-mh1.tar.gz.part0`, `.part1`, `.part2` (at
+most 10 MB each) with `package-mh1.sha256`, handed to you privately by the owner (not on
+the release; please keep it private and do not publish it), and three release assets in
+one directory `assets-mh1/` next to the kit (the same three files as for version 1):
 
 ```
 cpython-3.14.6-x86_64-unknown-linux-gnu-install_only.tar.gz
@@ -224,11 +235,18 @@ the same package, code and endpoint file.
 
 The full run goes through four stages in order and prints progress: learning through the
 gate (3 completed cycles), learning without the gate (3 batches on the same evidence
-conversations), the held-out evaluation (9,000 conversations), and a smaller trajectory
-evaluation. Ctrl-C (or a SIGTERM from your
+conversations), the held-out evaluation (9,000 conversations, up to 18,000 when some learned changes wait for our
+review: they are evaluated too), and a smaller trajectory evaluation. Block `c9b` then runs
+a fifth stage, `probe` (about 400 recorded conversations and about 12,000 shorter
+continuations; it prints `probe base: ...` and `probe branches: ...`). It runs only if the
+`c9b` smoke run's probe part reproduced its recorded conversations exactly; otherwise it
+is skipped and says so (that needs nothing from you). If only the probe fails, the run
+still ends with `"ok": true` and the failure is in `runs/mh1-c9b/probe/error.json`. Ctrl-C (or a SIGTERM from your
 scheduler) stops it within seconds (conversations in flight are killed and not recorded);
 the same command resumes. A run that ends prints `"ok": true` and
-writes `done.json` in its folder.
+writes `done.json` in its folder. Some learned changes may wait for a review on our side;
+that is expected and needs nothing from you: the run continues and the export carries
+them.
 
 ## 4. Export and send back (CPU)
 
@@ -245,9 +263,13 @@ scripts/xp/pack_export.sh handoff-mh1 export-mh1-c9b export-mh1-c27b \
   server-9b.log server-27b.log endpoint-mh1.yaml
 ```
 
-Expected size: 10–30 MB in 10 MB parts. Export works on an unfinished run too (it marks
-the export incomplete), so after an exit 4 or 5 export and pack the same way. If
-`pack_export.sh` refuses (over 100 MB), tell us before sending; do not drop files.
+Expected size: 8–15 MB in at most two 10 MB parts; it must stay **under 20 MB**. Export
+keeps each block within its budget by itself (it shortens dialogue text only), and
+`pack_export.sh` packs each log over 200 KB as its last 200 KB. Export works on an
+unfinished run too (it marks the export incomplete), so after an exit 4 or 5 export and
+pack the same way. If `pack_export.sh` refuses (20 MB or more), do not send anything: tell
+us the size of each folder (`du -sh export-* *.log`) and we will say what to do; do not
+drop files.
 
 Send every `handoff-mh1.tar.gz.part-*` and `handoff-mh1.sha256`, plus a short note:
 wall-clock time per block, GPU type and count, any halts, stops or exit codes. Keep the
