@@ -6,7 +6,8 @@ The broker is where mediation happens and is recorded:
   guards on the episode's observations) decides allow / block; one mediation record per
   proposed call (main agent, review fork and the startup canary alike);
 * ``tool``: a task tool executes only against an unconsumed allow record for the same call
-  (by tool-call id, else by tool and canonical arguments); otherwise it is refused and logged
+  (by tool-call id, tool and canonical arguments: EXACTLY the approved ones, which the
+  plugin has already coerced to what Hermes executes); otherwise it is refused and logged
   as an unmediated execution attempt (Hermes swallows hook-dispatch exceptions, so this is
   the fail-closed backstop);
 * ``hello``: the runner's attestation; the broker refuses a run whose materialisation hash
@@ -38,6 +39,7 @@ def _canon(v: Any) -> str:
 # Hermes write origins of the main agent (tools.skill_provenance; turn_context sets
 # "assistant_tool" for a turn). The review fork is "background_review"; anything else is denied.
 FOREGROUND = frozenset({"foreground", "assistant_tool"})
+CANARY_PREFIX = "slh-canary-"  # call ids of the runner's startup canaries
 
 
 class Broker:
@@ -130,6 +132,10 @@ class Broker:
         call_id = str(msg.get("call_id") or "")
         origin = str(msg.get("origin") or "unknown")
         allow, reason = guard_host.check(tool, args, role=self.role, task_tools=self.task_tools)
+        if call_id.startswith(CANARY_PREFIX):
+            # the runner's startup canaries are recorded and ALWAYS blocked (whatever the
+            # surface guard would say): they test the path, they never run
+            allow, reason = False, "startup canary"
         verdicts: dict[str, Any] = {"host": reason}
         if allow and tool in self.task_tools:
             if origin not in FOREGROUND:

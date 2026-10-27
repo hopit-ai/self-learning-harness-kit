@@ -279,8 +279,17 @@ def canaries(ep: dict, agent) -> dict:
     res["skill_tool_reply"] = str(out)[:300]
     for f in staged:
         os.unlink(os.path.join(home, "pending", "skills", f))
+    # 3. (v2.2) Hermes' argument coercion: a task-tool call with MISTYPED array arguments
+    # through the real dispatch; the plugin coerces before the guard (the harness checks
+    # the recorded arguments are lists); the guard must block it
+    cc = ep.get("coerce_canary")
+    if cc:
+        block, _ = _dispatch_pre_tool_call_hooks(
+            cc["tool"], dict(cc["args"]), tool_call_id=f"slh-canary-coerce-{nonce}",
+            task_id="slh-canary", session_id="slh-canary", turn_id="slh-canary")
+        res["coerce_call_blocked"] = block is not None
     res["ok"] = bool(res["forbidden_call_blocked"] and res["memory_write_staged"]
-                     and res["skill_write_staged"])
+                     and res["skill_write_staged"] and res.get("coerce_call_blocked", True))
     return res
 
 

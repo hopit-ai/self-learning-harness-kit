@@ -72,7 +72,7 @@ from typing import Any
 from slh.system.hosts.hermes.errors import HaltError, IncidentError, RefusedError
 
 PLAN_SCHEMA = "slh-mh1-plan-v1"
-PLAN_ID = "mh1-2026-10-25-v2.1"  # v2.1: setup and symlink fixes (s. 17); v1: mh1-2026-10-24
+PLAN_ID = "mh1-2026-10-25-v2.2"  # v2.2: argument coercion (s. 18); v2.1 s. 17; v1 2026-10-24
 PACKAGE_SCHEMA = "slh-mh1-package-v1"
 EXPORT_SCHEMA = "slh-mh1-export-v1"
 REPO = Path(__file__).resolve().parents[4]
@@ -949,9 +949,15 @@ class ParallelAdapter:
         return out  # type: ignore[return-value]
 
 
+def sealed_tag(tag: str) -> bool:
+    """A C_hold arm's tag (``H<k>``): its episodes are never copied in plaintext."""
+    return tag.startswith(HOLD_ARM) and tag[len(HOLD_ARM):].isdigit()
+
+
 def make_adapter_factory(pkg: Package, *, block: str, agent: Any, customer: Callable[[], Any],
                          host: Any, limits: Limits, work_root: Path, sandbox: bool = True,
-                         record_dialogue: bool = True) -> Callable[[], Any]:
+                         record_dialogue: bool = True, keep_incidents: Path | None = None
+                         ) -> Callable[[], Any]:
     from slh.system.hosts.hermes.adapter import HermesAdapter
 
     pool = pkg.pool()
@@ -965,7 +971,8 @@ def make_adapter_factory(pkg: Package, *, block: str, agent: Any, customer: Call
                              run_budget_seconds=limits.run_budget_seconds,
                              wall_clock_s=limits.wall_clock_s,
                              review_join_s=limits.review_join_s, work_root=work_root,
-                             sandbox=sandbox, record_dialogue=record_dialogue)
+                             sandbox=sandbox, record_dialogue=record_dialogue,
+                             keep_incidents=keep_incidents, keep_skip=sealed_tag)
 
     return make
 
@@ -2376,8 +2383,11 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
             {"sandbox": SB.backend_report(), "hermes": host.identity(),
              "time": time.time()}, indent=1, default=str))
         work = Path(args.work_root or os.environ.get("SLH_EPISODE_TMP", "/tmp"))
+        # (v2.2) episodes that end in an incident are copied into the run folder for
+        # debugging (pack them on exit 5; the work root is often a node's /tmp)
         make = make_adapter_factory(pkg, block=block, agent=agent, customer=customer,
-                                    host=host, limits=limits, work_root=work)
+                                    host=host, limits=limits, work_root=work,
+                                    keep_incidents=out / "incident-episodes")
         pad = ParallelAdapter(make, args.workers, health=health)
         prop = HermesStagedProposer(host=host, work_root=work)
         from slh.system.hosts.hermes import probe as PR

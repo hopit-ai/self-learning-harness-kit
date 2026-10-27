@@ -13,8 +13,9 @@
 #   cat NAME.tar.gz.part-* > NAME.tar.gz && sha256sum -c NAME.sha256
 #
 # The Hermes run (NAME handoff-mh1*; owner 2026-10-25): the whole hand-back must stay
-# UNDER 20,000,000 bytes, so the pack is refused when the archive, or all returned parts
-# plus the NAME.sha256 file, reach 20,000,000 bytes or more, and a
+# UNDER 20,000,000 bytes, so the pack is refused when the archive, or ALL returned
+# handoff-mh1* parts plus their .sha256 files in this directory (the main pack and an
+# incident pack together), reach 20,000,000 bytes or more, and a
 # *.log file larger than 200,000 bytes is packed as its LAST 200,000 bytes
 # (NAME.logtails/<file>, listed in NAME.logtails.txt; server logs can be very large and
 # only their end is needed). PACK_MAX_BYTES may only LOWER the cap (tests).
@@ -70,11 +71,17 @@ rm -f "$NAME.tar.gz.part-"*
 split -b 10000000 -a 2 "$NAME.tar.gz" "$NAME.tar.gz.part-"
 if command -v sha256sum >/dev/null; then SUM=sha256sum; else SUM="shasum -a 256"; fi
 $SUM "$NAME.tar.gz" "$NAME.tar.gz.part-"* > "$NAME.sha256"
-# what is sent back is every part plus the checksum file: all of it counts against the cap
-TOTAL=$(cat "$NAME.tar.gz.part-"* "$NAME.sha256" | wc -c | tr -d ' ')
+# what is sent back is every part plus the checksum file: all of it counts against the cap;
+# for the Hermes run the cap is ONE total over every returned handoff-mh1* pack here (the
+# main hand-back and, after an exit 5, the incident pack)
+if [ -n "$LOGTAIL" ]; then
+  TOTAL=$(cat handoff-mh1*.tar.gz.part-* handoff-mh1*.sha256 2>/dev/null | wc -c | tr -d ' ')
+else
+  TOTAL=$(cat "$NAME.tar.gz.part-"* "$NAME.sha256" | wc -c | tr -d ' ')
+fi
 if [ "$TOTAL" -ge "$CAP" ]; then
-  echo "REFUSED: the parts and $NAME.sha256 are $TOTAL bytes (they must stay under $CAP"
-  echo "bytes); do not send them: tell us the size of each folder you packed (du -sh)"
+  echo "REFUSED: the returned parts and .sha256 files are $TOTAL bytes (they must stay under"
+  echo "$CAP bytes in total); do not send them: tell us the size of each folder you packed"
   rm -f "$NAME.tar.gz" "$NAME.tar.gz.part-"* "$NAME.sha256"
   exit 1
 fi

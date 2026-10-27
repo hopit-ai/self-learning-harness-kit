@@ -201,6 +201,10 @@ class HermesAdapter:
     review_join_s: float = 90.0
     work_root: Path | None = None  # episode roots (short path: a Unix socket lives there)
     keep_runs: bool = False
+    # (v2.2) a copy of every episode folder that ended in an incident or a crash of the
+    # harness side, kept for debugging (the work root is often a node's /tmp)
+    keep_incidents: Path | None = None
+    keep_skip: Callable[[str], bool] | None = None  # tags never copied (sealed arms)
     sandbox: bool = True
     soul: str = MZ.DEFAULT_SOUL
     config_extra: Mapping[str, Any] | None = None
@@ -335,9 +339,14 @@ class HermesAdapter:
             raise NotImplementedError("checker candidates are not enforced in Hermes runs yet")
         root = Path(tempfile.mkdtemp(prefix="slh-h-", dir=str(self.work_root or "/tmp")))
         root = Path(os.path.realpath(root))
+        o = None
         try:
-            return self._run_in(root, r)
+            o = self._run_in(root, r)
+            return o
         finally:
+            if self.keep_incidents is not None and (o is None or o.incident) and not (
+                    self.keep_skip is not None and self.keep_skip(str(r.tag))):
+                keep_episode(root, Path(self.keep_incidents), r)
             if not self.keep_runs:
                 SB.rmtree(root)
 
@@ -376,6 +385,7 @@ class HermesAdapter:
               "max_iterations": self.max_iterations,
               "run_budget_seconds": self.run_budget_seconds,
               "review_join_s": self.review_join_s, "canary_nonce": nonce,
+              "coerce_canary": coerce_canary(self.surface.tool_schemas),
               "workspace": str(ws), "out_dir": str(outd),
               "session_id": f"slh-{_sha(unit.unit_id + r.tag)[:12]}",
               "hermes_clone": str(self.host.clone.resolve()), "hermes_sha": self.host.sha,
@@ -479,6 +489,10 @@ class HermesAdapter:
         can = res.get("canaries")
         if res.get("exit_code") == 5 or (can is not None and not can.get("ok")):
             reasons.append(f"canary failed: {can}")
+        why = coerce_canary_failure(broker, getattr(self.surface, "tool_schemas", None) or [],
+                                    can)
+        if why:
+            reasons.append(f"coercion canary: {why}")
         if staged and unit.role != "evidence":
             reasons.append(f"{len(staged)} staged write(s) in a {unit.role} run")
         if broker.unmediated:
@@ -519,7 +533,8 @@ class HermesAdapter:
         elif unit.role == "evidence" and review.get("status") != "joined":
             status = "unscored"  # the fork did not finish: unscored for evidence
         incident = bool(reasons)
-        proposed = [m for m in broker.mediation if m["tool"] in self.surface.task_tools]
+        proposed = [m for m in broker.mediation if m["tool"] in self.surface.task_tools
+                    and not str(m.get("call_id") or "").startswith(CANARY_PREFIX)]
         # labels come from OUR side's ground truth (the session saw every executed task
         # call), so a killed or crashed run is still labelled (a wrong write then a kill is
         # critical); success and harm count only for complete, scored runs
@@ -573,6 +588,68 @@ class HermesAdapter:
 
 
 # ---------------------------------------------------------------------- helpers
+
+
+CANARY_PREFIX = "slh-canary-"  # call ids of the runner's startup canaries (never proposals)
+COERCE_CANARY_ID = "slh-canary-coerce"
+
+
+def coerce_canary(schemas: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """The startup canary of Hermes' argument coercion (v2.2): a call of the first task tool
+    with an array parameter, its array arguments MISTYPED (a bare string; a JSON-encoded
+    string), sent through Hermes' real pre_tool_call dispatch. The plugin must hand the
+    guard the coerced (list) arguments, and the guard must block it (it never runs)."""
+    for sc in schemas:
+        props = (sc.get("parameters") or {}).get("properties") or {}
+        arrays = [k for k, v in props.items() if v.get("type") == "array"]
+        if not arrays:
+            continue
+        args: dict[str, Any] = {}
+        for k in (sc.get("parameters") or {}).get("required") or list(props):
+            if k in arrays:
+                args[k] = "1008292230" if arrays.index(k) % 2 == 0 else '["1008292230"]'
+            else:
+                args[k] = "slh-canary"
+        return {"tool": sc["name"], "args": args, "arrays": arrays}
+    return None
+
+
+def coerce_canary_failure(broker: Any, schemas: Sequence[Mapping[str, Any]],
+                          can: Mapping[str, Any] | None) -> str | None:
+    """None when the coercion canary behaved: the harness recorded it with list-typed array
+    arguments, blocked it, and nothing ran. A run that never reached its canaries is judged
+    elsewhere (no canary result)."""
+    spec = coerce_canary(schemas)
+    if spec is None or not can or "coerce_call_blocked" not in can:
+        return None
+    recs = [m for m in broker.mediation
+            if str(m.get("call_id") or "").startswith(COERCE_CANARY_ID)]
+    if len(recs) != 1:
+        return f"{len(recs)} mediation records"
+    r = recs[0]
+    if r["allow"]:
+        return "the guard allowed it"
+    if not all(isinstance(r["args"].get(k), list) for k in spec["arrays"]):
+        return f"the guard saw uncoerced arguments {r['args']}"
+    if any(str(e.get("call_id") or "").startswith(COERCE_CANARY_ID) for e in broker.executed):
+        return "it executed"
+    return None
+
+
+def keep_episode(root: Path, dest: Path, r: Any, cap: int = 50) -> Path | None:
+    """Copy an episode folder (no sockets; at most ``cap`` kept per destination) to
+    ``dest/<unit>-<tag>-<time>``; never raises (debug aid only)."""
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+        if sum(1 for _ in dest.iterdir()) >= cap:
+            return None
+        name = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{r.unit.unit_id}-{r.tag}-{int(time.time())}")
+        out = dest / name[:150]
+        shutil.copytree(root, out, symlinks=True,
+                        ignore=lambda d, fs: [f for f in fs if f.endswith(".sock")])
+        return out
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def critical_kinds(session: Any, critical: bool | None) -> list[str]:

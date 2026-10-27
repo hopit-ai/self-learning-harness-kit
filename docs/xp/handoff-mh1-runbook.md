@@ -1,12 +1,14 @@
 # Hand-off M-H1 runbook: Hermes Agent on the retail benchmark, three arms, two customer models
 
-**Version 2.1** (kit tag `mh1-2026-10-25-v2.1`, plan `mh1-2026-10-25-v2.1`). It replaces
-version 2 (tag `mh1-2026-10-25-v2`), which nobody has run: two setup fixes (the Hermes
-environment installs the dependency set exactly as locked and then checks it; the sandbox
-now works when a path such as `/home` is a symlink, so no workaround is needed) and new
-task data pieces (the same tasks; the kit checks their checksum). Version 1 (tag
-`mh1-2026-10-24-v1`) is superseded too. Set up in a NEW directory. The three release
-assets are unchanged (reuse `assets-mh1/`).
+**Version 2.2** (kit tag `mh1-2026-10-25-v2.2`, plan `mh1-2026-10-25-v2.2`). It replaces
+versions 2.1 and 2. The fix: Hermes repairs badly typed tool arguments (for example a
+list of item ids written as a plain string) only AFTER our guard has approved the call,
+so the executed arguments differed from the approved ones and the run stopped with exit 5.
+Our plugin now applies Hermes' own repair before the guard decides, and every episode
+checks this at start-up. Also kept from 2.1: the Hermes environment installs the locked
+packages exactly and checks them; the sandbox works when `/home` is a symlink. New task
+data pieces (the same tasks; the kit checks their checksum). Start fresh in a NEW
+directory. The three release assets are unchanged (reuse `assets-mh1/`).
 
 This file ships in the kit (`docs/xp/handoff-mh1-runbook.md`). The kit's `README.md` names
 the tag (a new tag of `hopit-ai/self-learning-harness-kit`; earlier tags are unchanged) and
@@ -49,7 +51,12 @@ same command resumes) and tell us.
 1. **Exit 4** (refused: the package, code, endpoint file or run folder differ from what we
    registered, or the sandbox self-test failed; or an unexpected error, traceback in
    `halt.json`): stop, pack, tell us. Do not work around it.
-2. **Exit 5** (a sandbox incident): stop, pack, tell us.
+2. **Exit 5** (a sandbox incident): stop, pack, tell us. The run folder keeps a copy of
+   every episode that ended in an incident (`runs/<run>/incident-episodes/`, at most 50;
+   the episode work folder itself is often under a node's `/tmp`, which may be cleaned):
+   pack it separately, `scripts/xp/pack_export.sh handoff-mh1-incident
+   runs/<run>/incident-episodes`, in the same directory as the main pack, and send it with
+   the rest (both packs together must stay under 20 MB; the script checks the total).
 3. **Exit 3** (halted, reason in `halt.json` in the run folder; usually a server stopped
    answering) or an interruption: fix the cause and rerun the same command; it resumes
    (finished episodes are kept; nothing produced while a server was down is recorded).
