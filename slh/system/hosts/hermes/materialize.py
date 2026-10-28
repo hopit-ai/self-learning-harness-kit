@@ -38,6 +38,16 @@ PLUGIN_FILES = ("plugin.yaml", "__init__.py")
 IMMUTABLE_DIRS = (".slh", "memories", "skills", f"plugins/{PLUGIN_NAME}")
 IMMUTABLE_ROOT_FILES = ("config.yaml", "SOUL.md")
 MANIFEST = ".slh/manifest.json"
+# (v2.4) Hermes' memory store takes an flock on ``<memory file>.lock`` next to each memory
+# file (``MemoryStore._file_lock``: O_RDWR|O_CREAT|O_NOFOLLOW, then fchmod 0600) before it
+# stages a ``patch``/``remove`` (it pins the matched entry under the lock). In the read-only
+# learned state that open failed, the exception escaped the memory tool, and Hermes' outer
+# loop answered every call of that assistant message (siblings never reached the hook):
+# the partner's c9b smoke halt (design s. 20). The lock files are created EMPTY and
+# writable here, outside the manifest; the sandbox re-allows exactly these files; the
+# post-run check requires them to be empty regular files.
+LOCK_FILES = ("memories/MEMORY.md.lock", "memories/USER.md.lock")
+LOCK_MODE = 0o600
 FILE_MODE = 0o444
 DIR_MODE = 0o555
 DEFAULT_SOUL = ("You are a careful assistant. Use the provided tools to complete the task, "
@@ -151,6 +161,11 @@ def materialize(state: HarnessState, home: Path, cfg: Mapping[str, Any],
     mp = home / MANIFEST
     mp.write_bytes((_canon(man) + "\n").encode())
     os.chmod(mp, FILE_MODE)
+    for p in LOCK_FILES:
+        fp = home / p
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_bytes(b"")
+        os.chmod(fp, LOCK_MODE)
     for d in sorted(man["dirs"], key=lambda x: -x.count("/")):
         os.chmod(home / d, DIR_MODE)
     # mutable areas Hermes needs (created writable, outside the binding)
@@ -170,7 +185,13 @@ def rehash(home: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
             missing.append(p)
         elif sha256_bytes(fp.read_bytes()) != h:
             changed.append(p)
-    known = set(manifest["files"]) | {MANIFEST}
+    for p in LOCK_FILES:  # (v2.4) present, a regular file, and still empty
+        fp = home / p
+        if fp.is_symlink() or not fp.is_file():
+            missing.append(p)
+        elif fp.stat().st_size != 0:
+            changed.append(p)
+    known = set(manifest["files"]) | {MANIFEST} | set(LOCK_FILES)
     for d in IMMUTABLE_DIRS:
         root = home / d
         if not root.exists():

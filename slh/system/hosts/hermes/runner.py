@@ -603,8 +603,29 @@ def run_review(agent, history: list, join_s: float) -> dict:
             "seconds": round(time.time() - t, 3), "forks": len(FORK_TRANSCRIPTS)}
 
 
+def _redacted_tool_results(out: dict) -> dict:
+    """(v2.4) Outer-loop answers through Hermes' OWN log redaction (the same function its log
+    formatter applies, in this profile), so the harness can bind them to the redacted
+    ``errors.log`` record."""
+    try:
+        from agent.redact import redact_sensitive_text
+    except Exception:  # noqa: BLE001 - without it only the raw text is compared
+        return {}
+    got: dict = {}
+    for t in [out.get("messages") or [], *FORK_TRANSCRIPTS]:
+        for m in t or []:
+            c = m.get("content") if isinstance(m, dict) and m.get("role") == "tool" else None
+            if isinstance(c, str) and c.startswith("Error executing tool: ") and c not in got:
+                import contextlib
+
+                with contextlib.suppress(Exception):  # unredacted: compared raw only
+                    got[c] = redact_sensitive_text(c)
+    return got
+
+
 def _finish(ep: dict, out: dict, agent, code: int) -> int:
     out["fork_transcripts"] = FORK_TRANSCRIPTS
+    out["redacted_tool_results"] = _redacted_tool_results(out)
     if ep.get("probe"):
         out["probe"] = PROBE
     out["exit_code"] = code
@@ -705,8 +726,27 @@ def main(argv: list[str]) -> int:
     return run_episode(ep)
 
 
+def flush_hermes_logs(timeout_s: float = 10.0) -> None:
+    """(v2.4) Hermes writes its log files from a background QueueListener; ``os._exit`` below
+    would drop records still queued, e.g. the ``Outer loop error in API call #n`` traceback
+    that the harness binds an outer-loop answer to. Stop (flush) the listener, bounded."""
+    def stop() -> None:
+        import contextlib
+
+        # best effort: a record that still misses fails closed (the answer is not recognised)
+        with contextlib.suppress(Exception):
+            import hermes_logging
+
+            hermes_logging._stop_queue_listener()
+
+    t = threading.Thread(target=stop, daemon=True, name="slh-log-flush")
+    t.start()
+    t.join(timeout_s)
+
+
 if __name__ == "__main__":
     rc = main(sys.argv)
+    flush_hermes_logs()
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(rc)  # daemon threads (an unjoined review fork) must not keep the process alive

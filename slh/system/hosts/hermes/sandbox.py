@@ -124,10 +124,12 @@ def python_roots(python: Path) -> list[Path]:
 
 def profile(*, writable: Sequence[Path], readonly: Sequence[Path], model_port: int | None,
             readable: Sequence[Path] | None = None, sockets: Sequence[str] = (),
-            secret_roots: Sequence[Path] = ()) -> str:
+            secret_roots: Sequence[Path] = (), writable_files: Sequence[Path] = ()) -> str:
     """Seatbelt profile text (last matching rule wins).
 
     * writes: only under ``writable``; ``readonly`` paths inside them are denied again;
+      ``writable_files`` (exact existing files, e.g. Hermes' memory lock files inside the
+      read-only learned state, v2.4) are allowed again after that (literal paths only);
     * reads (file data): only ``readable`` + ``SYSTEM_READ`` when ``readable`` is given;
       metadata stays readable (path resolution); ``SECRET_DENY`` and ``secret_roots`` are
       denied explicitly whatever else allows;
@@ -147,6 +149,9 @@ def profile(*, writable: Sequence[Path], readonly: Sequence[Path], model_port: i
         lines.append("(deny file-write* " + " ".join(
             f"(subpath {_q(p)})" if Path(p).is_dir() else f"(literal {_q(p)})"
             for p in readonly) + ")")
+    if writable_files:
+        lines.append("(allow file-write* " + " ".join(
+            f"(literal {_q(os.path.realpath(p))})" for p in writable_files) + ")")
     if readable is not None:
         roots = [*readable, *SYSTEM_READ]
         lines += ["(deny file-read-data)",
@@ -257,10 +262,19 @@ class LinuxSpec:
     readable: tuple[str, ...]
     sockets: tuple[str, ...] = ()
     secret_roots: tuple[str, ...] = ()
+    # (v2.4) exact existing files re-bound writable on top of the read-only learned state
+    # (Hermes' memory lock files); each must be a regular file inside a writable bind
+    writable_files: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for p in (*self.writable, *self.readable):
             _check_bindable(Path(p))
+        for f in self.writable_files:
+            rf = Path(os.path.realpath(f))
+            if Path(f).is_symlink() or not rf.is_file():
+                raise ValueError(f"writable file {f} must be an existing regular file")
+            if not any(Path(os.path.realpath(w)) in rf.parents for w in self.writable):
+                raise ValueError(f"writable file {rf} is not inside a writable bind")
         for sp in self.secret_roots:
             s = Path(os.path.realpath(sp))
             for p in (*self.writable, *self.readable):
@@ -299,6 +313,10 @@ class LinuxSpec:
             rp = os.path.realpath(p)
             if os.path.exists(rp):
                 a += ["--ro-bind", rp, rp]
+        # (v2.4) exact lock files writable again on top of the read-only learned state
+        for f in self.writable_files:
+            rf = os.path.realpath(f)
+            a += ["--bind", rf, rf]
         # symlinked ancestors of every path used unresolved (argv, binds, venv links),
         # recreated inside: the binds are at real paths (``symlink_chain``)
         used = [c for c in cmd if isinstance(c, str) and os.path.isabs(c)]
@@ -325,19 +343,22 @@ class LinuxSpec:
 
 def contain(*, writable: Sequence[Path], readonly: Sequence[Path], model_port: int | None,
             readable: Sequence[Path] | None = None, sockets: Sequence[str] = (),
-            secret_roots: Sequence[Path] = ()) -> str | LinuxSpec:
+            secret_roots: Sequence[Path] = (), writable_files: Sequence[Path] = ()
+            ) -> str | LinuxSpec:
     """The containment for this platform's backend: Seatbelt profile text (macOS) or a
     ``LinuxSpec`` (bubblewrap). Refuses (RuntimeError) when there is no backend."""
     name = backend()
     if name == "seatbelt":
         return profile(writable=writable, readonly=readonly, model_port=model_port,
-                       readable=readable, sockets=sockets, secret_roots=secret_roots)
+                       readable=readable, sockets=sockets, secret_roots=secret_roots,
+                       writable_files=writable_files)
     if name == "bwrap":
         return LinuxSpec(writable=tuple(str(p) for p in writable),
                          readonly=tuple(str(p) for p in readonly),
                          readable=tuple(str(p) for p in (readable or ())),
                          sockets=tuple(str(s) for s in sockets),
-                         secret_roots=tuple(str(p) for p in secret_roots))
+                         secret_roots=tuple(str(p) for p in secret_roots),
+                         writable_files=tuple(str(p) for p in writable_files))
     raise RuntimeError("no sandbox backend (sandbox-exec on macOS, a self-tested bubblewrap "
                        f"on Linux): {backend_report()}; refusing to run uncontained")
 

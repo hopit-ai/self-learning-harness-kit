@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "bcfa3f0e2175485342e292b7551cf28b2f360233",
-  "tree": "f101005a1549deb6b178c545234ad69874255ecd"
+  "commit": "947747514d3f97c9aa3508ff179dcdc052e4a8b3",
+  "tree": "b963640de371819f14dd47265750251499040d92"
  },
  "files": {
   ".gitignore": {
@@ -22,17 +22,17 @@
   "README-plain.md": {
    "bytes": 5558,
    "mode": "644",
-   "sha256": "41b161ae9b1e95ba2945e6b5b34beb7e34355d2acff963dbcdde6650cab26205"
+   "sha256": "529bd4293f6f99f31a3f5058ac42545f13ac96e97f868b9cd6af07c5e5e96013"
   },
   "README.md": {
    "bytes": 2207,
    "mode": "644",
-   "sha256": "dbddd13b62b14915d2ba7710b2286c65d4807c9bd3e65e256490b07668f16b9a"
+   "sha256": "0a2475680f90cd87e1e6377e34dc0cbac27daa7058a5b0597b125167dcca4284"
   },
   "docs/xp/handoff-mh1-runbook.md": {
-   "bytes": 15379,
+   "bytes": 20383,
    "mode": "644",
-   "sha256": "7f174f7da567354b803709ba13c358f714b376954a54cb19c7ab90b3143f9fc7"
+   "sha256": "d4142db87b3e71d318a44051ea29192731c25973853a22d068f99c4b33f5c5c3"
   },
   "pyproject.toml": {
    "bytes": 1574,
@@ -45,9 +45,9 @@
    "sha256": "69c6ed0fc244631b78427e377ac8c7f19ac31a4e6252ee997094a2e6926e6c9e"
   },
   "scripts/xp/pack_export.sh": {
-   "bytes": 4025,
+   "bytes": 4706,
    "mode": "755",
-   "sha256": "6da43e8e6bf1ace51afdf65ee45b09dd3ae542f64f4e6a4257fca49efa780694"
+   "sha256": "dfbfd847408addb61dd2bde7bcd2c4227ba621a85b756eef61f5bf7c4e62f5f6"
   },
   "scripts/xp/setup_hermes_offline.sh": {
    "bytes": 3081,
@@ -400,9 +400,9 @@
    "sha256": "e8cd444a38b1a5431cb2839fbb8f03a17dbdb751ce8d124b2902ef7bd5566e0d"
   },
   "slh/system/hosts/hermes/adapter.py": {
-   "bytes": 37692,
+   "bytes": 52847,
    "mode": "644",
-   "sha256": "abe047496449412de875ac469f9a6bb81c243c4dda7d56027aa93b559d6ad652"
+   "sha256": "8334de04d069a7eb55e5ba66200c79b8efdb2ad7f0867854b422e4ebd4e6b408"
   },
   "slh/system/hosts/hermes/bridge.py": {
    "bytes": 12113,
@@ -425,9 +425,9 @@
    "sha256": "1894d632304f3844b61df166c1cdac0bd50310f6eb421ad673057a054a49c28b"
   },
   "slh/system/hosts/hermes/materialize.py": {
-   "bytes": 9726,
+   "bytes": 10913,
    "mode": "644",
-   "sha256": "d45ed6ac2f68b368bd0fcc5e05cbcedc7f93be4ce461605fe1cd8da2f768ce3f"
+   "sha256": "3e490905db50b5866ba93ea682ff3df09d1d027f13818bd24121bc6ec3f5dd5c"
   },
   "slh/system/hosts/hermes/meter.py": {
    "bytes": 10107,
@@ -435,14 +435,14 @@
    "sha256": "99810767091fab07f2a4389ab3fa38a1cf5d03bdbe750061fcf4fda89bf54846"
   },
   "slh/system/hosts/hermes/mh1.py": {
-   "bytes": 137406,
+   "bytes": 170781,
    "mode": "644",
-   "sha256": "477d876033ccb7dfa9336571a4a5c72c861ba02205380b91679aea57801fc3ab"
+   "sha256": "c918191b0bdc6f36cbfee82165326b95e540079ea8de8ab1aa51cca266e18e88"
   },
   "slh/system/hosts/hermes/mh1_package.json": {
    "bytes": 231,
    "mode": "644",
-   "sha256": "967ab9aea12ce1fe54ab83048d8e56f81e1aa6fab12b325706fe0e3ea4245a40"
+   "sha256": "c4b9d1f8c53436af3e0684ef370557a89189c5a72b663114e7cb1306c3d618ce"
   },
   "slh/system/hosts/hermes/plugin/__init__.py": {
    "bytes": 6508,
@@ -455,9 +455,9 @@
    "sha256": "4e1e81e4c3e9b14f0e856251438f21ad9d1bd25f1aae7e69bece1b980d50fba0"
   },
   "slh/system/hosts/hermes/probe.py": {
-   "bytes": 102424,
+   "bytes": 103801,
    "mode": "644",
-   "sha256": "48e59b73bab1b5c4e7c4ac01c9a3c2b2e919b440e6644a24a8c17a06424440d7"
+   "sha256": "c91b1bd8c792e856565fe925c6da25908d0b650529e25057cef99c11788c528a"
   },
   "slh/system/hosts/hermes/probe_arms.py": {
    "bytes": 17649,
@@ -485,14 +485,14 @@
    "sha256": "c4e0964e0b3455bb6203878b99e4f668f55464c32a84a02cbf8b77b48d3ffb4b"
   },
   "slh/system/hosts/hermes/runner.py": {
-   "bytes": 30226,
+   "bytes": 31940,
    "mode": "644",
-   "sha256": "1967e757b7158939c2ec8a2c27e4c5d3a85e23696b59e0036097c0624cb34d1b"
+   "sha256": "4b8038566ce9e9b41e0fa295b2cb6fb8fcc9e78225cdf0a326d2f625578273eb"
   },
   "slh/system/hosts/hermes/sandbox.py": {
-   "bytes": 28269,
+   "bytes": 29643,
    "mode": "644",
-   "sha256": "2a18f64b970026af9fa33cc7bfe3f8d5f511b289d38d8945d199413a612cd35d"
+   "sha256": "a0b96830bf5327b514b0af4a3bd9eab1580a4fab34621a337ef7477e1c7167b8"
   },
   "slh/system/hosts/hermes/seal.py": {
    "bytes": 7075,
@@ -500,9 +500,9 @@
    "sha256": "a1c64e31758c771a3b2498a044f91d3c73f7dba203fb78c47a5965c3123ab37d"
   },
   "slh/system/hosts/hermes/stub_model.py": {
-   "bytes": 8618,
+   "bytes": 8885,
    "mode": "644",
-   "sha256": "3c3c34fd5248c3ca4c582a9e27d5ef5e7e1ef6c03a57cdd82ddd90003ed79b34"
+   "sha256": "29ef229366fdc98b784f392c4235dfe53ea6c6697cf8e19c10aabef70636a14e"
   },
   "slh/system/hosts/hermes/tau2_backend.py": {
    "bytes": 53269,
@@ -752,7 +752,7 @@
  },
  "kit_repo": "hopit-ai/self-learning-harness-kit",
  "phase1_package": false,
- "plan_id": "mh1-2026-10-25-v2.2",
+ "plan_id": "mh1-2026-10-25-v2.5",
  "plan_sha256": null,
  "registration_sha256": null,
  "release": {
@@ -795,13 +795,13 @@
   "rehearsal": false,
   "runbook": "docs/xp/handoff-mh1-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "mh1-2026-10-25-v2.2"
+  "tag": "mh1-2026-10-25-v2.5"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "mh1-2026-10-25-v2.2"
+  "phase1": "mh1-2026-10-25-v2.5"
  },
- "total_bytes": 2767901,
+ "total_bytes": 2828035,
  "variant": "plain"
 }

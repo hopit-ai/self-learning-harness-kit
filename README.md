@@ -3,15 +3,15 @@
 **Hand-off: Hermes Agent on the retail benchmark (current): start with [docs/xp/handoff-mh1-runbook.md](docs/xp/handoff-mh1-runbook.md)**;
 it refers to README-plain.md for the environment and the agent server.
 
-Plan `mh1-2026-10-25-v2.2`: the code that runs (`slh/`, `configs/`, `scripts/xp/`,
+Plan `mh1-2026-10-25-v2.5`: the code that runs (`slh/`, `configs/`, `scripts/xp/`,
 `pyproject.toml`), the hand-off packages listed below and `MANIFEST.json` (SHA-256 of every
 file). This release runs no phase 1 and ships no phase-1 package. No job scripts: you
 start the servers yourself ([README-plain.md](README-plain.md): environment and servers)
 and follow the runbook above.
 
-## Release `mh1-2026-10-25-v2.2`
+## Release `mh1-2026-10-25-v2.5`
 
-This commit is tag `mh1-2026-10-25-v2.2` of `hopit-ai/self-learning-harness-kit` (a new tag; earlier tags are never
+This commit is tag `mh1-2026-10-25-v2.5` of `hopit-ai/self-learning-harness-kit` (a new tag; earlier tags are never
 moved). The hand-off packages are part of this tree (hashed in `MANIFEST.json`, their code
 registration checked against this tree when the release was built); this release runs only part H (Hermes Agent on the retail benchmark: three learning setups, two customer models (code only; task data handed over privately)):
 

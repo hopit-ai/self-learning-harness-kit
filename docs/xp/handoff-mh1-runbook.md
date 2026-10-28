@@ -1,14 +1,19 @@
 # Hand-off M-H1 runbook: Hermes Agent on the retail benchmark, three arms, two customer models
 
-**Version 2.2** (kit tag `mh1-2026-10-25-v2.2`, plan `mh1-2026-10-25-v2.2`). It replaces
-versions 2.1 and 2. The fix: Hermes repairs badly typed tool arguments (for example a
-list of item ids written as a plain string) only AFTER our guard has approved the call,
-so the executed arguments differed from the approved ones and the run stopped with exit 5.
-Our plugin now applies Hermes' own repair before the guard decides, and every episode
-checks this at start-up. Also kept from 2.1: the Hermes environment installs the locked
-packages exactly and checks them; the sandbox works when `/home` is a symlink. New task
-data pieces (the same tasks; the kit checks their checksum). Start fresh in a NEW
-directory. The three release assets are unchanged (reuse `assets-mh1/`).
+**Version 2.5** (kit tag `mh1-2026-10-25-v2.5`, plan `mh1-2026-10-25-v2.5`). New in 2.5:
+each block can run on several nodes (section 3b); with one node nothing changes. It
+replaces versions 2.4 and earlier. Fixed in 2.4: the cause of the exit 5 in the 2.1/2.2 smoke runs: when the
+model edits an existing memory note in the after-conversation review, Hermes takes a lock
+on a small file next to the memory file; the sandbox keeps that folder read-only, the edit
+failed, and Hermes answered every other call of that turn with an error without passing
+them through our check. Version 2.4 creates those lock files up front as the only writable
+files in that folder (they must stay empty; anything else is still an incident). Kept from
+2.3: Hermes' own refusals (a malformed call, an unknown tool name) are recorded instead of
+stopping the run (the smoke report lists them by kind), and a stopped conversation is
+ALWAYS kept in the run folder (`incident-episodes/`). Kept from 2.2 and 2.1: Hermes'
+argument repair before our guard; the locked Hermes install; `/home` symlinks. New task
+data pieces (the same tasks). Start fresh in a NEW directory. The three
+release assets are unchanged (reuse `assets-mh1/`).
 
 This file ships in the kit (`docs/xp/handoff-mh1-runbook.md`). The kit's `README.md` names
 the tag (a new tag of `hopit-ai/self-learning-harness-kit`; earlier tags are unchanged) and
@@ -51,8 +56,9 @@ same command resumes) and tell us.
 1. **Exit 4** (refused: the package, code, endpoint file or run folder differ from what we
    registered, or the sandbox self-test failed; or an unexpected error, traceback in
    `halt.json`): stop, pack, tell us. Do not work around it.
-2. **Exit 5** (a sandbox incident): stop, pack, tell us. The run folder keeps a copy of
-   every episode that ended in an incident (`runs/<run>/incident-episodes/`, at most 50;
+2. **Exit 5** (a sandbox incident or a mediation failure): stop, pack, tell us. The run
+   folder keeps a copy of every episode that stopped the run, with our side's records of
+   every tool decision (`runs/<run>/incident-episodes/`, at most 50;
    the episode work folder itself is often under a node's `/tmp`, which may be cleaned):
    pack it separately, `scripts/xp/pack_export.sh handoff-mh1-incident
    runs/<run>/incident-episodes`, in the same directory as the main pack, and send it with
@@ -260,6 +266,84 @@ the same command resumes. A run that ends prints `"ok": true` and
 writes `done.json` in its folder. Some learned changes may wait for a review on our side;
 that is expected and needs nothing from you: the run continues and the export carries
 them.
+
+## 3b. Several nodes (optional, version 2.5)
+
+You can run each block's full run on N nodes (N = 1 to 4; above 4 the return could pass
+20 MB, so the kit refuses). Learning stays on one node
+(it is sequential); once it is done, the held-out evaluation, the trajectory evaluation and
+the probe are split into N shards by a fixed hash of each conversation, one node each. Every
+node starts its own servers (section 1) and needs the same package, kit, Hermes clone and
+endpoint file, and a shared filesystem for the `runs/` folders. **N = 1 is exactly the
+one-node run above**: leave `--shards` out. The smoke runs always run on one node.
+
+Per block (`B=c9b` or `B=c27b`), N nodes:
+
+```bash
+# 1) the learning node (one job): learning, then it writes runs/mh1-$B/learned/
+$PY -m slh.system.hosts.hermes.mh1 run --block $B --shards $N --out runs/mh1-$B $COMMON
+# 2) N eval shards (I = 0 .. N-1, one node each), after the learning job ended "ok": true
+$PY -m slh.system.hosts.hermes.mh1 run --block $B --shards $N --shard $I \
+  --learned runs/mh1-$B --out runs/mh1-$B-s$I $COMMON
+```
+
+With Slurm (one script `node.sh` that starts the servers of section 1, waits for them, then
+runs the command it is given):
+
+```bash
+L=$(sbatch --parsable -N1 --gres=gpu:8 node.sh learn $B $N)
+sbatch -N1 --gres=gpu:8 --array=0-$((N-1)) --dependency=afterok:$L node.sh shard $B $N
+# in node.sh: shard I = $SLURM_ARRAY_TASK_ID
+```
+
+If the learning job stops (exit 3) and you resubmit it, the pending eval array still waits
+on the OLD job id and will never start: cancel it and submit the array again with
+`--dependency=afterok:<new learning job id>`. To resume one eval shard, resubmit only that
+array index (`--array=2`) with the same N; never rerun learning to resume a shard.
+
+Each eval shard copies the learning node's states into its own folder, checks them against
+their hashes, and refuses if they belong to another run. Every job resumes with the same
+command (Ctrl-C or a scheduler stop, as above). Export every folder: `runs/mh1-$B` (the
+learning node) and `runs/mh1-$B-s0` .. `runs/mh1-$B-s<N-1>`, and pack them **all into the
+one `handoff-mh1` pack** of section 4 (list every export folder); the 20 MB limit is one
+total for everything returned, whatever N (it holds by construction for N up to 4).
+Byte shares per block: the learning export about 2 MB (learning, not trimmed) and at most
+0.4 MB of probe rows; each eval shard 1/N of the remaining 3 MB, a probe share sized for
+the largest shard (about 0.6 MB at N = 4), and one sealed file of a fixed size (about
+0.5 MB at N = 4). `pack_export.sh` keeps all log tails together under 1 MB, so list every
+node's logs.
+
+**Biggest saving first: put the two blocks on separate nodes.** Today both blocks share one
+node (the 9B on GPUs 0-3 serves both agents and the `c9b` customer, the 27B on GPUs 4-7).
+Learning does not get faster with more eval nodes, but each block's learning gets twice
+the GPUs on a node of its own (`c9b`: the 9B on all 8 GPUs, `--data-parallel-size 8`;
+`c27b`: the 9B and the 27B on 4 GPUs each, as in section 1). The two blocks are
+independent: run them at the same time, each with its own learning node and, optionally,
+its own N eval nodes (at most 2N nodes at once).
+
+Expected wall-clock at 10 conversations per GPU-minute (the smoke run measures your real
+rate; at 5 double these, at 20 halve them), from the first full-run job to the last, with
+both blocks running at the same time (range: no learned change waits for review .. every
+cycle runs its full confirmation; excluded: queueing, server start, smoke runs, packing):
+
+| layout | nodes at most | both blocks done |
+|---|---|---|
+| one node for both blocks (as before) | 1 | 11.4 – 30.5 h |
+| one node per block, N = 1 | 2 | 5.7 – 15.3 h |
+| one learning node per block, then N = 2 eval nodes per block | 4 | 3.9 – 12.5 h |
+| N = 4 per block | 8 | 2.9 – 11.1 h |
+
+Per block with its own nodes (learning on one 8-GPU node, then N eval nodes):
+
+| block | N = 1 | N = 2 | N = 4 |
+|---|---|---|---|
+| `c9b` (with the probe) | 5.7 – 15.3 h | 3.9 – 12.5 h | 2.9 – 11.1 h |
+| `c27b` | 4.3 – 13.9 h | 3.2 – 11.8 h | 2.6 – 10.8 h |
+
+Learning alone is 2.0 – 9.7 h per block on its own node; N = 2 to 4 gives most of what
+sharding can add. If a shard stops with exit 3, fix the cause and rerun that shard's
+command (only that array index); never rerun learning to resume a shard. For exit 4 or 5,
+stop every job of the block, export and pack what exists, and tell us.
 
 ## 4. Export and send back (CPU)
 

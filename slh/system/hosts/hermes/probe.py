@@ -1147,6 +1147,13 @@ class ProbeRun:
     chooser: PromptedChooser | None
     smoke: bool
     log: Callable[[str], None] = print
+    # (v2.5) multi-node: this run's share of the base units (``BlockRun.mine``: every unit
+    # when N = 1), and which parts run here: base/decisions/branches ("episodes", on each
+    # eval shard) and the type-2 prompted review choice ("review", on the learning node,
+    # which holds C's evidence episodes)
+    mine: Callable[[str], bool] | None = None
+    parts: tuple[str, ...] = ("episodes", "review")
+    budget: int = BUDGET_BYTES  # this run's share of the probe's part of the return
 
     def __post_init__(self) -> None:
         from slh.system.hosts.hermes.mh1 import Jsonl
@@ -1200,10 +1207,17 @@ class ProbeRun:
         done = {r["case"] for r in self.base_log.rows()}
         # byte admission (prereg additions s. 8): never more parents than the frozen
         # per-parent bound allows inside the probe's share of the return
-        cap = max_parents()
+        cap = max_parents()  # the parents one node admits (the shards split exactly these)
         if len(self.units) > cap:
             self.log(f"probe: capacity stop at {cap} parents (byte bound)")
-        todo = [u for u in self.units[:cap] if u["case"] not in done]
+        todo = [u for u in self.units[:cap] if u["case"] not in done
+                and (self.mine is None or self.mine(u["case"]))]
+        # (v2.5) a shard's own parents must fit its byte budget (``shard_probe_budget`` is
+        # sized from the largest shard): refuse rather than export a cut probe
+        mine = [u for u in self.units[:cap] if self.mine is None or self.mine(u["case"])]
+        if self.mine is not None and len(mine) > max_parents(self.budget):
+            raise ProbeBudgetError(f"this shard's {len(mine)} parents exceed its budget "
+                                   f"({max_parents(self.budget)} parents)")
         for k in range(0, len(todo), self.sizes.chunk):
             part = todo[k:k + self.sizes.chunk]
             reqs = [(probe_unit(pool, u["case"]), {"mode": "record", "tag": f"pb|{u['case']}"})
@@ -1468,17 +1482,22 @@ class ProbeRun:
                 self.log(f"probe skipped: {rep}")
                 return rep
         t0 = time.time()
-        self.run_base()
-        dec = self.plan_decisions()
-        self.run_branches(dec)
-        self.run_review_prompted(run_dir)
+        dec: list[dict[str, Any]] = []
+        if "episodes" in self.parts:
+            self.run_base()
+            dec = self.plan_decisions()
+            self.run_branches(dec)
+        if "review" in self.parts:
+            self.run_review_prompted(run_dir)
         rep = {"probe_id": self.plan["probe_id"], "plan_sha256": self.plan["sha256"],
+               **({"parts": list(self.parts)} if self.parts != ("episodes", "review")
+                  else {}),
                "smoke": self.smoke, "base": len(self.base_log.rows()),
                "decisions": {t: sum(1 for d in dec if d["type"] == t) for t in (1, 3)},
                "fidelity": self.fidelity(), "minutes": round((time.time() - t0) / 60, 1),
                "review_prompted": len(self.rev_log.rows())}
         try:
-            files = export_rows(run_dir)
+            files = export_rows(run_dir, self.budget)
         except ProbeBudgetError as e:
             rep["bytes"] = {"over_budget": str(e)}
             st.write_text(json.dumps(rep, indent=1))

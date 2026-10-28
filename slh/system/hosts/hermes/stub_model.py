@@ -23,8 +23,11 @@ CONTEXT_LENGTH = 131072
 
 
 def _message(turn: Mapping[str, Any], n: int) -> dict[str, Any]:
-    calls = [{"id": f"call_{n}_{i}", "type": "function",
-              "function": {"name": c["name"], "arguments": json.dumps(c.get("arguments", {}))}}
+    """A policy may set a call's ``id`` (e.g. a provider-minted ``chatcmpl-tool-*`` or a
+    reused id) and ``raw_arguments`` (the exact argument string, e.g. invalid JSON)."""
+    calls = [{"id": c.get("id") or f"call_{n}_{i}", "type": "function",
+              "function": {"name": c["name"], "arguments": c["raw_arguments"]
+                           if "raw_arguments" in c else json.dumps(c.get("arguments", {}))}}
              for i, c in enumerate(turn.get("tool_calls") or [])]
     msg: dict[str, Any] = {"role": "assistant", "content": turn.get("content")}
     if calls:

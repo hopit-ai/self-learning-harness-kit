@@ -16,7 +16,8 @@
 # UNDER 20,000,000 bytes, so the pack is refused when the archive, or ALL returned
 # handoff-mh1* parts plus their .sha256 files in this directory (the main pack and an
 # incident pack together), reach 20,000,000 bytes or more, and a
-# *.log file larger than 200,000 bytes is packed as its LAST 200,000 bytes
+# *.log file larger than its share (200,000 bytes, or less: all log tails together stay
+# within 1,000,000 bytes) is packed as its LAST bytes of that share
 # (NAME.logtails/<file>, listed in NAME.logtails.txt; server logs can be very large and
 # only their end is needed). PACK_MAX_BYTES may only LOWER the cap (tests).
 set -euo pipefail
@@ -29,6 +30,17 @@ case "$NAME" in
   handoff-mh1*) CAP=20000000; LOGTAIL=200000 ;;
 esac
 if [ -n "${PACK_MAX_BYTES:-}" ] && [ "$PACK_MAX_BYTES" -lt "$CAP" ]; then CAP=$PACK_MAX_BYTES; fi
+# (v2.5) the log tails TOGETHER stay within 1,000,000 bytes (more nodes, more logs): each
+# *.log is packed as at most 1,000,000 / (number of *.log files) bytes (and 200,000 at most)
+if [ -n "$LOGTAIL" ]; then
+  NLOGS=0
+  for p in "$@"; do
+    if [ -f "$p" ] && [ "${p%.log}" != "$p" ]; then NLOGS=$((NLOGS + 1)); fi
+  done
+  if [ "$NLOGS" -gt 0 ] && [ $((1000000 / NLOGS)) -lt "$LOGTAIL" ]; then
+    LOGTAIL=$((1000000 / NLOGS))
+  fi
+fi
 HAVE=()
 MISSING=()
 TAILED=()
@@ -74,14 +86,22 @@ $SUM "$NAME.tar.gz" "$NAME.tar.gz.part-"* > "$NAME.sha256"
 # what is sent back is every part plus the checksum file: all of it counts against the cap;
 # for the Hermes run the cap is ONE total over every returned handoff-mh1* pack here (the
 # main hand-back and, after an exit 5, the incident pack)
+COUNTED=()
 if [ -n "$LOGTAIL" ]; then
-  TOTAL=$(cat handoff-mh1*.tar.gz.part-* handoff-mh1*.sha256 2>/dev/null | wc -c | tr -d ' ')
+  for f in handoff-mh1*.tar.gz.part-* handoff-mh1*.sha256; do
+    [ -f "$f" ] && COUNTED+=("$f")
+  done
 else
-  TOTAL=$(cat "$NAME.tar.gz.part-"* "$NAME.sha256" | wc -c | tr -d ' ')
+  COUNTED=("$NAME.tar.gz.part-"* "$NAME.sha256")
 fi
+TOTAL=$(cat "${COUNTED[@]}" | wc -c | tr -d ' ')
 if [ "$TOTAL" -ge "$CAP" ]; then
   echo "REFUSED: the returned parts and .sha256 files are $TOTAL bytes (they must stay under"
   echo "$CAP bytes in total); do not send them: tell us the size of each folder you packed"
+  echo "counted (bytes, file):"
+  for f in "${COUNTED[@]}"; do
+    echo "  $(wc -c < "$f" | tr -d ' ')  $f"
+  done
   rm -f "$NAME.tar.gz" "$NAME.tar.gz.part-"* "$NAME.sha256"
   exit 1
 fi

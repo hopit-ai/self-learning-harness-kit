@@ -60,6 +60,8 @@ import math
 import os
 import queue
 import random
+import re
+import shutil
 import sys
 import threading
 import time
@@ -72,7 +74,7 @@ from typing import Any
 from slh.system.hosts.hermes.errors import HaltError, IncidentError, RefusedError
 
 PLAN_SCHEMA = "slh-mh1-plan-v1"
-PLAN_ID = "mh1-2026-10-25-v2.2"  # v2.2: argument coercion (s. 18); v2.1 s. 17; v1 2026-10-24
+PLAN_ID = "mh1-2026-10-25-v2.5"  # v2.5: multi-node (s. 21); v2.4 s. 20; v2.3 s. 19
 PACKAGE_SCHEMA = "slh-mh1-package-v1"
 EXPORT_SCHEMA = "slh-mh1-export-v1"
 REPO = Path(__file__).resolve().parents[4]
@@ -207,6 +209,105 @@ def seal_pad_bound(sizes: Sizes) -> int:
     learning cycle x the eval units) at ``SEAL_ROW_BOUND`` each, plus 64 KiB for the arm
     records, incidents and framing."""
     return sizes.learn_batches * sizes.eval_units * SEAL_ROW_BOUND + 65_536
+
+
+# (v2.5) multi-node: learning (B batches, C cycles) stays sequential on ONE node per block;
+# the held-out eval (A/B/C/H), the trajectory eval and the S1 probe's episodes are split
+# into N shards by a fixed hash of the case id (``shard_of``), one node each, every node
+# with its own servers. N = 1 is the unsharded run, exactly as before. Design s. 21.
+SHARD_SALT = "mh1-shard-v1"
+# N <= 4 keeps the whole return under the 20 MB hard total BY CONSTRUCTION (``return_bound``,
+# tested); larger N would rely on pack_export's refusal (design s. 21)
+MAX_SHARDS = 4
+LEARNED_DIR = "learned"  # the learning node's states for the eval shards (hash-verified)
+LEARNED_SCHEMA = "slh-mh1-learned-v1"
+SHARD_SEAL_FRAMING = 65_536
+
+
+def shard_of(case_id: str, n: int) -> int:
+    """The shard (0..n-1) of a case: a fixed hash, independent of order and node."""
+    if n <= 1:
+        return 0
+    return int(_sha(f"{SHARD_SALT}|{case_id}")[:16], 16) % n
+
+
+SHARD_LEARN_PROBE_BYTES = 400_000  # the learning node's probe part (type-2 review rows)
+# the learning node's plaintext part (B and C: never trimmed); the eval shards share the
+# rest of the block's plaintext target, 1/N each, so the block total is as on one node
+SHARD_LEARN_PLAIN_BYTES = 2_000_000
+
+
+def shard_probe_budget(probe_plan: Mapping[str, Any], n: int, smoke: bool) -> int:
+    """Every eval shard's probe byte budget: the fixed part plus the per-parent bound for the
+    LARGEST shard's parent count (the parents one node would admit, split by case), so a
+    shard admits all its parents and none of its rows can be dropped (a function of the
+    probe plan and N only)."""
+    from slh.system.hosts.hermes import probe as PR
+
+    sz = probe_plan["smoke_sizes" if smoke else "sizes"]
+    units = probe_plan["units"]["smoke" if smoke else "full"][:sz["base_episodes"]]
+    units = units[:PR.max_parents()]
+    most = max(sum(1 for u in units if shard_of(u["case"], n) == i) for i in range(n))
+    return PR.FIXED_BYTES + PR.PER_PARENT_BOUND * most
+
+
+def shard_budgets(n: int, role: str | None, probe_budget: int | None = None
+                  ) -> dict[str, int]:
+    """Byte targets of one run's export (compressed): the plaintext part (only dialogue text
+    is ever trimmed to meet it) and the probe part (hard). N = 1: as before. N > 1: the
+    learning node keeps B and C (not trimmable; SHARD_LEARN_PLAIN_BYTES) and the type-2
+    probe rows; each eval shard gets 1/N of the rest of the block's plaintext target and
+    ``probe_budget`` (``shard_probe_budget``,
+    recorded in its identity). The hard total over every returned piece stays
+    ``RETURN_BUDGET["hard_cap_total"]`` (``pack_export.sh``; bounded by ``return_bound``)."""
+    from slh.system.hosts.hermes import probe as PR
+
+    full = RETURN_BUDGET["full_block_plain"]
+    if n <= 1 or role is None:
+        return {"full_plain": full, "probe": PR.BUDGET_BYTES}
+    if role == "learn":
+        return {"full_plain": SHARD_LEARN_PLAIN_BYTES, "probe": SHARD_LEARN_PROBE_BYTES}
+    return {"full_plain": (full - SHARD_LEARN_PLAIN_BYTES) // n,
+            "probe": int(probe_budget) if probe_budget else PR.BUDGET_BYTES // n}
+
+
+def return_bound(n: int, probe_plan: Mapping[str, Any], eval_cases: Sequence[str],
+                 sizes: Sizes | None = None) -> dict[str, int]:
+    """The compressed bytes the whole full-run return can reach with N nodes per block, by
+    construction: per block the plaintext targets (as on one node, 5 MB: the eval shares are
+    1/N each), N sealed files of the fixed shard size (one of the one-node size when N = 1);
+    the probe (c9b only): N shards at ``shard_probe_budget`` plus the learning node's part;
+    both smoke runs; the logs (``pack_export.sh`` caps all log tails together at
+    LOG_TOTAL_BYTES); and a per-export allowance for identities and manifests."""
+    from slh.system.hosts.hermes import probe as PR
+
+    s = sizes or DEFAULT_SIZES
+    seal = SEAL_PADDED["full"] if n <= 1 else n * shard_seal_padded(s, eval_cases, n)
+    probe = PR.BUDGET_BYTES if n <= 1 else (n * shard_probe_budget(probe_plan, n, False)
+                                            + SHARD_LEARN_PROBE_BYTES)
+    exports = 2 * (n + (1 if n > 1 else 0)) + 2  # per block: nodes (+ learning); 2 smokes
+    parts = {"plain": 2 * RETURN_BUDGET["full_block_plain"], "sealed": 2 * seal,
+             "probe": probe, "smoke": 2 * (RETURN_BUDGET["smoke_block_plain"]
+                                           + RETURN_BUDGET["smoke_block_sealed"]),
+             "logs": LOG_TOTAL_BYTES, "per_export": exports * PER_EXPORT_BYTES}
+    parts["total"] = sum(parts.values())
+    return parts
+
+
+LOG_TOTAL_BYTES = 1_000_000  # pack_export.sh: all log tails together (handoff-mh1 packs)
+PER_EXPORT_BYTES = 60_000  # identity, preflight, throughput, manifest per export (generous)
+
+
+def shard_cases(case_ids: Sequence[str], n: int, i: int) -> list[str]:
+    return [c for c in case_ids if shard_of(c, n) == i]
+
+
+def shard_seal_padded(sizes: Sizes, eval_cases: Sequence[str], n: int) -> int:
+    """The sealed size of EVERY shard's C_hold file: the bound for the largest shard (a
+    function of the plan and N only, so a file's size says nothing about its outcomes)."""
+    units = list(eval_cases)[:sizes.eval_units]
+    most = max(len(shard_cases(units, n, i)) for i in range(n))
+    return sizes.learn_batches * most * SEAL_ROW_BOUND + SHARD_SEAL_FRAMING
 
 
 def sealed_row(r: Mapping[str, Any]) -> dict[str, Any]:
@@ -992,9 +1093,18 @@ def outcome_row(arm: str, o: Any, d: Mapping[str, Any], *, stage: str) -> dict[s
             "review": (tr.get("review") or {}).get("status"),
             "staged": len(tr.get("staged") or []), "seconds": d.get("seconds"),
             "killed": d.get("killed"), "writes": d.get("writes") or [],
+            # (v2.3) calls Hermes answered itself without the hook or any execution
+            "hermes_answered": answered_counts(tr),
             **act_counts(d.get("dialogue")),
             "usage": {k: v for k, v in (tr.get("usage") or {}).items()
                       if isinstance(v, (int, float))}}
+
+
+def answered_counts(trace: Mapping[str, Any]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for a in trace.get("hermes_answered_without_execution") or []:
+        out[a.get("reason", "?")] = out.get(a.get("reason", "?"), 0) + 1
+    return out
 
 
 def act_counts(dialogue: Sequence[Mapping[str, Any]] | None) -> dict[str, Any]:
@@ -1094,6 +1204,10 @@ class BlockRun:
     probe_chooser: Any = None
     probe_smoke: bool = False
     probe_require: Path | None = None
+    # (v2.5) multi-node: ``shards`` N; ``shard`` None on the learning node (or N = 1), else
+    # this eval shard's index, whose arms come from ``<out>/learned`` (``load_learned``)
+    shards: int = 1
+    shard: int | None = None
 
     def __post_init__(self) -> None:
         from slh.system.stores import VersionStore
@@ -1282,13 +1396,48 @@ class BlockRun:
                               if needs_review(o) or sampled(o.unit_id)])
             self.log(f"{name}: {min(i + chunk, len(todo))}/{len(todo)} episodes")
 
-    def run_eval(self) -> None:
+    def mine(self, case_id: str) -> bool:
+        """This run's share of the eval / trajectory / probe units (all of them when N = 1
+        and on the learning node, which runs none of them when N > 1)."""
+        return self.shard is None or shard_of(case_id, self.shards) == self.shard
+
+    def learned_states(self) -> dict[str, Any]:
+        """The eval arms, hold arms and trajectory states: from the learning node's bundle
+        on an eval shard, else from this run's own B and C (as before)."""
+        if self.shard is not None:
+            return load_learned(self.out / LEARNED_DIR)
         from slh.state import HarnessState
 
         b_rows = self.b_states()
         b_final = self.bver.load(b_rows[-1]) if b_rows else HarnessState.empty()
         c_final, halted = self.c_final()
-        arms = {"A": HarnessState.empty(), "B": b_final, "C": c_final}
+        traj: list[tuple[str, Any]] = [("A", HarnessState.empty())]
+        for i, v in enumerate(b_rows):
+            traj.append((f"B{i}", self.bver.load(v)))
+        h = self.c_harness()
+        try:
+            for r in self.cver_log.rows():
+                traj.append((f"C{r['batch']}", h.versions.load(r["pointer"])))
+        finally:
+            h.close()
+        return {"arms": {"A": HarnessState.empty(), "B": b_final, "C": c_final},
+                "c_halted": halted, "holds": self.hold_arms(), "trajectory": dict(traj)}
+
+    def run_eval(self) -> None:
+        if self.shard is not None:
+            ls = self.learned_states()
+            self._run_eval(ls["arms"], ls["c_halted"], ls["holds"])
+            return
+        from slh.state import HarnessState
+
+        b_rows = self.b_states()
+        b_final = self.bver.load(b_rows[-1]) if b_rows else HarnessState.empty()
+        c_final, halted = self.c_final()
+        self._run_eval({"A": HarnessState.empty(), "B": b_final, "C": c_final}, halted,
+                       self.hold_arms())
+
+    def _run_eval(self, arms: Mapping[str, Any], halted: Any, holds: Mapping[str, Any]
+                  ) -> None:
         arms_log = Jsonl(self.out / "eval" / "arms.jsonl")
         if not arms_log.rows():
             arms_log.append([{"arm": a, "version": s.version_id, "state": _state_summary(s),
@@ -1297,7 +1446,7 @@ class BlockRun:
         recorded = {r["arm"]: r["version"] for r in arms_log.rows()}
         if any(recorded.get(a) != s.version_id for a, s in arms.items()):
             raise RefusedError(f"eval arms differ from the recorded ones {recorded}")
-        holds = self.hold_arms()  # C_hold (s. 15): same units, same customers, sealed
+        # C_hold (s. 15): same units, same customers, sealed
         hlog = Jsonl(self.out / "eval" / "hold-arms.jsonl")
         if not hlog.rows() and holds:
             hlog.append([{"arm": a, "k": int(a[len(HOLD_ARM):]), "version": st.version_id,
@@ -1305,7 +1454,7 @@ class BlockRun:
         hrec = {r["arm"]: r["version"] for r in hlog.rows()}
         if hrec != {a: st.version_id for a, st in holds.items()}:
             raise RefusedError(f"C_hold arms differ from the recorded ones {hrec}")
-        units = self.pkg.eval_units[:self.sizes.eval_units]
+        units = [c for c in self.pkg.eval_units[:self.sizes.eval_units] if self.mine(c)]
         self._eval("primary", {**arms, **holds}, units, sealed=sorted(holds))
 
     def hold_arms(self) -> dict[str, Any]:
@@ -1322,19 +1471,52 @@ class BlockRun:
         return {f"{HOLD_ARM}{k}": vs.load(v) for k, v in ks.items()}
 
     def run_trajectory(self) -> None:
-        from slh.state import HarnessState
+        if self.shard is not None:
+            states = dict(self.learned_states()["trajectory"])
+        else:
+            from slh.state import HarnessState
 
-        states: dict[str, Any] = {"A": HarnessState.empty()}
-        for i, v in enumerate(self.b_states()):
-            states[f"B{i}"] = self.bver.load(v)
-        h = self.c_harness()
-        try:
-            for r in self.cver_log.rows():
-                states[f"C{r['batch']}"] = h.versions.load(r["pointer"])
-        finally:
-            h.close()
-        units = self.pkg.eval_units[:self.sizes.trajectory_units]
+            states = {"A": HarnessState.empty()}
+            for i, v in enumerate(self.b_states()):
+                states[f"B{i}"] = self.bver.load(v)
+            h = self.c_harness()
+            try:
+                for r in self.cver_log.rows():
+                    states[f"C{r['batch']}"] = h.versions.load(r["pointer"])
+            finally:
+                h.close()
+        units = [c for c in self.pkg.eval_units[:self.sizes.trajectory_units] if self.mine(c)]
         self._eval("trajectory", states, units)
+
+    def write_learned(self) -> dict[str, Any]:
+        """(v2.5, learning node of an N > 1 run) The states every eval shard needs, saved
+        content-addressed under ``<out>/learned`` with ``learned.json`` (version ids, every
+        file's sha256, the run identity, and its own hash). Idempotent: a rerun must
+        produce the same bundle."""
+        ls = self.learned_states()
+        d = self.out / LEARNED_DIR
+        sd = d / "states"
+        all_states = {**ls["arms"], **ls["holds"], **ls["trajectory"]}
+        for st in all_states.values():
+            st.save(sd)
+        files = {p.relative_to(d).as_posix(): sha_file(p)
+                 for p in sorted(sd.rglob("*")) if p.is_file()}
+        body = {"schema": LEARNED_SCHEMA,
+                "identity": json.loads((self.out / "run.json").read_text()),
+                "arms": {a: st.version_id for a, st in ls["arms"].items()},
+                "c_halted": ls["c_halted"],
+                "holds": {a: st.version_id for a, st in ls["holds"].items()},
+                "trajectory": [[k, st.version_id] for k, st in ls["trajectory"].items()],
+                "files": files}
+        body["sha256"] = _sha(_canon(body))
+        p = d / "learned.json"
+        if p.exists():
+            have = json.loads(p.read_text())
+            if have != body:
+                raise RefusedError(f"{p} exists with other content: the learning run changed")
+        else:
+            p.write_text(json.dumps(body, indent=1, sort_keys=True))
+        return {"learned_sha256": body["sha256"], "states": len(all_states)}
 
     # -------------------------------------------------------------- shared
 
@@ -1364,6 +1546,11 @@ class BlockRun:
             self.run_c()
         if "B" in self.stages:
             self.run_b()
+        learned = None
+        if self.shards > 1 and self.shard is None and {"B", "C"} <= set(self.stages):
+            # the learning node: the eval shards can start as soon as this exists
+            learned = self.write_learned()
+            self.log(f"learned states written: {learned}")
         if "eval" in self.stages:
             self.run_eval()
         if "trajectory" in self.stages and self.sizes.trajectory_units:
@@ -1380,6 +1567,8 @@ class BlockRun:
             rep["c_gate"] = c_gate_summary(Jsonl(audit).rows())
         if probe is not None:
             rep["probe"] = probe
+        if learned is not None:
+            rep["learned"] = learned
         Jsonl(self.out / "throughput.jsonl").append([rep | {"time": time.time()}])
         return rep
 
@@ -1399,9 +1588,15 @@ class BlockRun:
             p = Path(self.probe_require)
             req = json.loads(p.read_text()) if p.exists() else {}
         try:
+            parts = ("episodes", "review") if self.shards <= 1 else (
+                ("review",) if self.shard is None else ("episodes",))
+            role = None if self.shards <= 1 else ("learn" if self.shard is None else "eval")
+            pb = (shard_probe_budget(plan, self.shards, self.probe_smoke)
+                  if role == "eval" else None)
             rep = PR.ProbeRun(self.out, plan, self.adapter, self.probe_chooser,
-                              self.probe_smoke, log=self.log).run(self.out,
-                                                                  require_fidelity=req)
+                              self.probe_smoke, log=self.log, mine=self.mine, parts=parts,
+                              budget=shard_budgets(self.shards, role, pb)["probe"]
+                              ).run(self.out, require_fidelity=req)
             # a successful (re)run: an error file from an earlier attempt is stale
             (self.out / "probe" / "error.json").unlink(missing_ok=True)
             return rep
@@ -1416,6 +1611,95 @@ class BlockRun:
             (self.out / "probe" / "error.json").write_text(json.dumps(err, indent=1))
             self.log(f"probe failed (recorded in probe/error.json): {e!r}")
             return {"error": repr(e)[:300]}
+
+
+def _learned_body(d: Path) -> dict[str, Any]:
+    """``learned.json`` checked: its own hash and every state file's sha256."""
+    d = Path(d)
+    p = d / "learned.json"
+    if not p.exists():
+        raise RefusedError(f"no learned states at {d}: the learning run (no --shard) must "
+                           "finish B and C first")
+    body = json.loads(p.read_text())
+    if body.get("schema") != LEARNED_SCHEMA or _sha(_canon(
+            {k: v for k, v in body.items() if k != "sha256"})) != body.get("sha256"):
+        raise RefusedError(f"{p}: not a valid learned-states file")
+    bad = [f for f, h in (body.get("files") or {}).items()
+           if not (d / f).is_file() or (d / f).is_symlink() or sha_file(d / f) != h]
+    have = {q.relative_to(d).as_posix() for q in (d / "states").rglob("*") if q.is_file()} \
+        if (d / "states").exists() else set()
+    if bad or have != set(body.get("files") or {}):
+        raise RefusedError(f"{d}: learned states differ from learned.json "
+                           f"({sorted(bad or have ^ set(body.get('files') or {}))[:3]})")
+    return body
+
+
+def load_learned(d: Path) -> dict[str, Any]:
+    """The eval shard's arms, hold arms and trajectory states from the bundle (verified)."""
+    from slh.state import HarnessState
+
+    d = Path(d)
+    body = _learned_body(d)
+
+    def ld(v: str) -> Any:
+        st = HarnessState.load(d / "states", v)
+        if st.version_id != v:
+            raise RefusedError(f"learned state {v}: content does not match its id")
+        return st
+
+    return {"arms": {a: ld(v) for a, v in body["arms"].items()},
+            "c_halted": body.get("c_halted"),
+            "holds": {a: ld(v) for a, v in sorted(body["holds"].items())},
+            "trajectory": {k: ld(v) for k, v in body["trajectory"]},
+            "sha256": body["sha256"]}
+
+
+def copy_learned(src: Path, out: Path, ident: Mapping[str, Any]) -> str:
+    """Copy the learning node's bundle into this eval shard's run folder (once), verify it,
+    make it read-only, and check it belongs to this run (plan, package, code, block, mode,
+    N). Returns its hash."""
+    src, dest = Path(src), Path(out) / LEARNED_DIR
+    body = _learned_body(src)
+    li = body.get("identity") or {}
+    for k in ("plan_sha256", "package_sha256", "code_sha256", "block", "mode", "shards"):
+        if li.get(k) != ident.get(k):
+            raise RefusedError(f"the learned states belong to another run ({k}: "
+                               f"{li.get(k)} != {ident.get(k)})")
+    if li.get("role") != "learn":
+        raise RefusedError("the learned states do not come from a learning run")
+    if dest.exists():  # a resume: the same states, and read-only (re-applied if a crash
+        # interrupted it; the hashes are checked again after)
+        _read_only(dest)
+        if _learned_body(dest)["sha256"] != body["sha256"]:
+            raise RefusedError(f"{dest} holds other learned states")
+        return body["sha256"]
+    if Path(os.path.realpath(src)) != Path(os.path.realpath(dest)):
+        tmp = dest.with_name(dest.name + ".tmp")
+        if tmp.exists():
+            for root, dirs, fs in os.walk(tmp):
+                os.chmod(root, 0o755)
+            shutil.rmtree(tmp)
+        shutil.copytree(src, tmp, symlinks=True)
+        _read_only(tmp)  # read-only BEFORE it is published under its name
+        if _learned_body(tmp)["sha256"] != body["sha256"]:
+            raise RefusedError(f"{tmp}: the copy differs from {src}")
+        os.replace(tmp, dest)
+    _read_only(dest)
+    if _learned_body(dest)["sha256"] != body["sha256"]:
+        raise RefusedError(f"{dest}: the copy differs from {src}")
+    return body["sha256"]
+
+
+def _read_only(d: Path) -> None:
+    """Every file under ``d`` mode 0444 (set, then verified; refuses a symlink)."""
+    for root, _, fs in os.walk(d):
+        for f in fs:
+            q = os.path.join(root, f)
+            if os.path.islink(q):
+                raise RefusedError(f"{q}: a symlink in the learned states")
+            os.chmod(q, 0o444)
+            if os.stat(q).st_mode & 0o777 != 0o444:
+                raise RefusedError(f"{q}: could not be made read-only")
 
 
 def completed_cycles(audit_rows: Sequence[Mapping[str, Any]]) -> list[int]:
@@ -1433,10 +1717,9 @@ def completed_cycles(audit_rows: Sequence[Mapping[str, Any]]) -> list[int]:
         if r.get("kind") != "cycle_end":
             continue
         b = int(r["batch"])
-        if r.get("status") in ("ok", "halted") or (r.get("status") == "abandoned"
-                                                    and b in used):
-            if b not in out:
-                out.append(b)
+        if (r.get("status") in ("ok", "halted") or (r.get("status") == "abandoned"
+                                                     and b in used)) and b not in out:
+            out.append(b)
     return out
 
 
@@ -1595,10 +1878,13 @@ def export(run_dir: Path, dest: Path, *, max_review_bytes: int | None = None
 
     reviews = {n: Jsonl(run_dir / "eval" / f"{n}-review.jsonl").rows()
                for n in ("primary", "trajectory")}
+    nshards = int(ident.get("shards") or 1)
+    sb = shard_budgets(nshards, ident.get("role"), ident.get("probe_budget"))
+    share = 1.0 if nshards <= 1 or ident.get("role") != "eval" else 1.0 / nshards
 
     def put_reviews(scale: float, chars: int) -> None:
         for n, rows in reviews.items():
-            cap = int((max_review_bytes or REVIEW_CAPS[n]) * scale)
+            cap = int((max_review_bytes or REVIEW_CAPS[n]) * scale * share)
             put(f"eval/{n}-review.jsonl.gz", "".join(
                 json.dumps(r, sort_keys=True) + "\n"
                 for r in _review_rows(rows, cap, chars)).encode())
@@ -1665,10 +1951,12 @@ def export(run_dir: Path, dest: Path, *, max_review_bytes: int | None = None
         put(f"{rel}.gz", jl(run_dir / rel))
     for rel in ("halt.json", "run.json", "preflight.json", "smoke.json"):
         put(f"{rel}.gz", raw(run_dir / rel))
+    if ident.get("role") == "learn":  # (v2.5) the states every eval shard must have used
+        put("learned/learned.json.gz", raw(run_dir / LEARNED_DIR / "learned.json"))
     from slh.system.hosts.hermes import probe as PR
 
     try:  # the S1 headroom probe's part (hard-capped at its share of the return)
-        prows = PR.export_rows(run_dir)
+        prows = PR.export_rows(run_dir, sb["probe"])
     except PR.ProbeBudgetError as e:  # never cut silently: say so, keep status and error
         prows = {f"probe/{n}": (run_dir / "probe" / n).read_bytes()
                  for n in ("status.json", "error.json") if (run_dir / "probe" / n).exists()}
@@ -1676,8 +1964,8 @@ def export(run_dir: Path, dest: Path, *, max_review_bytes: int | None = None
     for name, data in prows.items():
         put(f"{name}.gz", data)
     mode = str(ident.get("mode") or "full")
-    budget = RETURN_BUDGET["full_block_plain" if mode == "full" else
-                           ("dry_plain" if mode == "dry" else "smoke_block_plain")]
+    budget = (sb["full_plain"] if mode == "full" else
+              RETURN_BUDGET["dry_plain" if mode == "dry" else "smoke_block_plain"])
 
     def plain() -> int:
         return sum((dest / f).stat().st_size for f in files
@@ -1714,6 +2002,186 @@ def _read_gz_jsonl(p: Path) -> list[dict[str, Any]]:
                 break
             raise
     return out
+
+
+def sealed_files(man: Mapping[str, Any]) -> list[str]:
+    """The export's sealed C_hold files: ``sealed/C_hold.seal`` (one node), or one
+    ``sealed/C_hold.s<i>.seal`` per eval shard (a merged multi-node export)."""
+    return sorted(f for f in man.get("files") or {}
+                  if f == "sealed/C_hold.seal" or re.fullmatch(r"sealed/C_hold\.s\d+\.seal", f))
+
+
+def sealed_digest(man: Mapping[str, Any]) -> str | None:
+    """What a hold commitment binds: the sealed file's sha256 (one node, as before), or the
+    hash of every shard's sealed-file sha256 (merged)."""
+    fs = sealed_files(man)
+    if not fs:
+        return None
+    if fs == ["sealed/C_hold.seal"]:
+        return man["files"]["sealed/C_hold.seal"]
+    return _sha(_canon({f: man["files"][f] for f in fs}))
+
+
+# (v2.5) Our side: one export per node -> one merged export in the one-node format, by
+# BYTES only (gzip members concatenated; nothing under eval/ or sealed/ is decompressed),
+# so it runs before the blind hold decisions. ``verify`` then checks every shard's rows.
+MERGE_CONCAT = ("eval/primary.jsonl.gz", "eval/trajectory.jsonl.gz",
+                "eval/primary-review.jsonl.gz", "eval/trajectory-review.jsonl.gz",
+                "incidents.jsonl.gz", "throughput.jsonl.gz", "probe/base.jsonl.gz",
+                "probe/decisions.jsonl.gz", "probe/branches.jsonl.gz",
+                "probe/dialogues.jsonl.gz", "probe/review-prompted.jsonl.gz",
+                "probe/review-rows.jsonl.gz")
+MERGE_SAME = ("eval/arms.jsonl.gz", "eval/hold-arms.jsonl.gz")
+
+
+def _export_learned(d: Path, man: Mapping[str, Any]) -> dict[str, Any]:
+    """The learning export's ``learned.json`` (states metadata, no outcome), its hash
+    checked."""
+    if "learned/learned.json.gz" not in man["files"]:
+        raise RefusedError(f"{d}: the learning export carries no learned.json")
+    body = json.loads(gzip.decompress((Path(d) / "learned/learned.json.gz").read_bytes()))
+    if body.get("schema") != LEARNED_SCHEMA or _sha(_canon(
+            {k: v for k, v in body.items() if k != "sha256"})) != body.get("sha256"):
+        raise RefusedError(f"{d}: learned.json is not valid")
+    return body
+
+
+def merge_exports(learn: Path, shard_exports: Sequence[Path], out: Path, pkg: Package
+                  ) -> dict[str, Any]:
+    """Merge a multi-node block (the learning export + one export per eval shard) into one
+    export in the one-node format; refuses unless: identities (plan, package, code, block,
+    mode, seal key, N, the learned states' hash) agree; every shard index 0..N-1 appears
+    once with exactly its own share of the held-out units (``shard_cases_sha256``); each
+    shard's arms and hold arms are byte-identical; every sealed file has the fixed shard
+    size. Each shard's files are also kept under ``shards/s<i>/`` for ``verify``."""
+    learn, out = Path(learn), Path(out)
+    if out.exists() and any(out.iterdir()):
+        raise RefusedError(f"{out} is not empty")
+    lman = json.loads((learn / "MANIFEST.json").read_text())
+    li = lman["identity"]
+    n = int(li.get("shards") or 1)
+    if li.get("role") != "learn" or n < 2:
+        raise RefusedError(f"{learn} is not the learning export of a multi-node run")
+    for k, want in (("plan_sha256", pkg.manifest["plan_sha256"]),
+                    ("package_sha256", pkg.manifest["sha256"]),
+                    ("code_sha256", pkg.manifest["code_sha256"])):
+        if li.get(k) != want:
+            raise RefusedError(f"learning export: {k} differs from the package")
+    sizes = pkg.sizes(li.get("mode") != "full")
+    units = pkg.eval_units[:sizes.eval_units]
+    pad = shard_seal_padded(sizes, pkg.eval_units, n)
+    mans: dict[int, tuple[Path, dict[str, Any]]] = {}
+    for e in shard_exports:
+        m = json.loads((Path(e) / "MANIFEST.json").read_text())
+        si = m["identity"]
+        i = si.get("shard")
+        for k in ("plan_sha256", "package_sha256", "code_sha256", "block", "mode",
+                  "seal_public_key", "shards", "probe_plan_sha256"):
+            if si.get(k) != li.get(k):
+                raise RefusedError(f"shard export {e}: {k} differs from the learning export")
+        if si.get("role") != "eval" or not isinstance(i, int) or not 0 <= i < n or i in mans:
+            raise RefusedError(f"shard export {e}: not a new eval shard of 0..{n - 1}")
+        if si.get("shard_cases_sha256") != _sha("\n".join(shard_cases(units, n, i))):
+            raise RefusedError(f"shard {i}: its held-out units are not shard {i} of {n}")
+        if (si.get("seal_public_key") or None) and si.get("seal_padded_bytes") != pad:
+            raise RefusedError(f"shard {i}: sealed size {si.get('seal_padded_bytes')} != {pad}")
+        for f, h in m["files"].items():
+            if not (Path(e) / f).is_file() or sha_file(Path(e) / f) != h:
+                raise RefusedError(f"shard {i}: checksum {f}")
+        mans[i] = (Path(e), m)
+    if sorted(mans) != list(range(n)):
+        raise RefusedError(f"shards {sorted(set(range(n)) - set(mans))} missing")
+    for f, h in lman["files"].items():
+        if not (learn / f).is_file() or sha_file(learn / f) != h:
+            raise RefusedError(f"learning export: checksum {f}")
+    lbody = _export_learned(learn, lman)
+    learned = {m["identity"].get("learned_sha256") for _, m in mans.values()}
+    if learned != {lbody["sha256"]}:
+        raise RefusedError("the shards' learned states are not this learning export's")
+    # every shard's sealed file, present iff hold arms exist, at the fixed size (the
+    # ciphertext's own length), checked BEFORE anything can be decided or unsealed
+    from slh.system.hosts.hermes import seal as SEAL
+
+    for i in range(n):
+        d, m = mans[i]
+        has = "sealed/C_hold.seal" in m["files"]
+        if has != bool(lbody.get("holds")):
+            raise RefusedError(f"shard {i}: sealed C_hold file "
+                               f"{'present' if has else 'missing'} but the learned states "
+                               f"have {len(lbody.get('holds') or {})} hold arm(s)")
+        if has:
+            head, _, ct = (d / "sealed/C_hold.seal").read_bytes().partition(b"\n")
+            try:
+                h = json.loads(head)
+            except ValueError:
+                h = {}
+            if h.get("scheme") != SEAL.SCHEME or h.get("recipient") != li.get(
+                    "seal_public_key") or not (len(ct) == h.get("padded") == pad):
+                raise RefusedError(f"shard {i}: sealed file header or size is not the fixed "
+                                   f"shard size {pad}")
+    out.mkdir(parents=True)
+    files: dict[str, str] = {}
+
+    def write(name: str, data: bytes) -> None:
+        q = out / name
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_bytes(data)
+        files[name] = sha_file(q)
+
+    order = [(learn, lman)] + [mans[i] for i in range(n)]
+    for name in MERGE_CONCAT:
+        parts = [(d / name).read_bytes() for d, m in order if name in m["files"]]
+        if parts:
+            write(name, b"".join(parts))
+    for name in MERGE_SAME:
+        got = {(d / name).read_bytes() for d, m in mans.values() if name in m["files"]}
+        if len(got) > 1:
+            raise RefusedError(f"{name} differs between shards")
+        if got:
+            write(name, got.pop())
+    cov: dict[str, Any] = {}
+    for i in range(n):
+        d, m = mans[i]
+        if "eval/hold-coverage.json.gz" not in m["files"]:
+            continue
+        c = json.loads(gzip.decompress((d / "eval/hold-coverage.json.gz").read_bytes()))
+        want = _sha("\n".join(sorted(f"hep:{x}" for x in shard_cases(units, n, i))))
+        for a, v in c.items():
+            t = cov.setdefault(a, {"rows": 0, "units": 0, "ok": True})
+            t["rows"] += int(v.get("rows") or 0)
+            t["units"] += int(v.get("units") or 0)
+            t["ok"] = t["ok"] and v.get("units_sha256") == want
+    if cov:
+        full = _sha("\n".join(sorted(f"hep:{x}" for x in units)))
+        write("eval/hold-coverage.json.gz", gzip.compress(json.dumps(
+            {a: {"rows": v["rows"], "units": v["units"],
+                 "units_sha256": full if v["ok"] else "shard coverage mismatch"}
+             for a, v in cov.items()}, sort_keys=True).encode(), mtime=0))
+    for i in range(n):
+        d, m = mans[i]
+        if "sealed/C_hold.seal" in m["files"]:
+            write(f"sealed/C_hold.s{i}.seal", (d / "sealed/C_hold.seal").read_bytes())
+    taken = set(MERGE_CONCAT) | set(MERGE_SAME) | {"eval/hold-coverage.json.gz"}
+    for f in lman["files"]:
+        if f not in taken and f not in files:
+            write(f, (learn / f).read_bytes())
+    for i in range(n):  # each shard, whole, for verify's per-shard checks
+        d, m = mans[i]
+        for f in m["files"]:
+            write(f"shards/s{i}/{f}", (d / f).read_bytes())
+        write(f"shards/s{i}/MANIFEST.json", (d / "MANIFEST.json").read_bytes())
+    man = {"schema": EXPORT_SCHEMA, "identity": li, "files": files,
+           "complete": bool(lman.get("complete")) and all(
+               bool(m.get("complete")) for _, m in mans.values()),
+           "exported": max([lman.get("exported") or 0] + [m.get("exported") or 0
+                                                         for _, m in mans.values()]),
+           "shards": {"n": n, "learned_sha256": lbody["sha256"],
+                      "learn_manifest_sha256": sha_file(learn / "MANIFEST.json"),
+                      "exports": {str(i): sha_file(mans[i][0] / "MANIFEST.json")
+                                  for i in range(n)}}}
+    (out / "MANIFEST.json").write_text(json.dumps(man, indent=1, sort_keys=True))
+    return {"ok": True, "shards": n, "files": len(files), "out": str(out),
+            "sealed": sealed_files(man)}
 
 
 def verify(export_dir: Path, pkg: Package) -> dict[str, Any]:
@@ -1754,7 +2222,7 @@ def verify(export_dir: Path, pkg: Package) -> dict[str, Any]:
     if ident.get("seal_public_key") != (pkg.plan.get("seal") or {}).get("public_key"):
         problems.append("identity: the seal key differs from the plan's")
     harms = _read_gz_jsonl(d / "eval" / "hold-arms.jsonl.gz")
-    if harms and "sealed/C_hold.seal" not in man["files"]:
+    if harms and not sealed_files(man):
         problems.append("C_hold arms were evaluated but their sealed outcomes are missing")
     if harms:
         covp = d / "eval" / "hold-coverage.json.gz"
@@ -1770,6 +2238,8 @@ def verify(export_dir: Path, pkg: Package) -> dict[str, Any]:
                                 "held-out units")
     if any(str(r.get("arm", "")).startswith(HOLD_ARM) for r in rows):
         problems.append("C_hold outcomes in the plaintext eval file")
+    if man.get("shards"):  # (v2.5) a merged multi-node export: every shard's own rows
+        problems += _verify_shards(d, man, pkg)
     traj = _read_gz_jsonl(d / "eval" / "trajectory.jsonl.gz")
     unmediated = sum(1 for r in rows + traj if not r.get("mediated"))
     if unmediated:
@@ -1788,6 +2258,68 @@ def verify(export_dir: Path, pkg: Package) -> dict[str, Any]:
             "incidents": len(incidents), "unmediated": unmediated, "status": status,
             "complete": man.get("complete"), "block": ident.get("block"),
             "mode": ident.get("mode")}
+
+
+def _verify_shards(d: Path, man: Mapping[str, Any], pkg: Package) -> list[str]:
+    """Each eval shard's rows: exactly its own held-out units, once per arm (A, B, C, and
+    every C_hold arm by coverage), and its trajectory units likewise."""
+    sh = man["shards"]
+    n = int(sh["n"])
+    ident = man["identity"]
+    sizes = pkg.sizes(ident.get("mode") != "full")
+    units = pkg.eval_units[:sizes.eval_units]
+    traj_units = pkg.eval_units[:sizes.trajectory_units]
+    out: list[str] = []
+    try:
+        lb = _export_learned(d, man)
+    except RefusedError as e:
+        return [str(e)]
+    if lb["sha256"] != sh.get("learned_sha256"):
+        out.append("the merged export's learned states are not the learning export's")
+    # the eval arms are the learned states, and those are the exported B and C
+    arms = {r["arm"]: r["version"] for r in _read_gz_jsonl(d / "eval" / "arms.jsonl.gz")}
+    if arms != lb["arms"]:
+        out.append(f"eval arms {arms} are not the learned states {lb['arms']}")
+    from slh.state import HarnessState
+
+    b = _read_gz_jsonl(d / "B" / "batches.jsonl.gz")
+    want_b = b[-1]["after"] if b else HarnessState.empty().version_id
+    if lb["arms"].get("B") != want_b:
+        out.append("the learned B is not B's last exported batch")
+    ptr = _read_gz_jsonl(d / "C" / "pointers.jsonl.gz")
+    if ptr and lb["arms"].get("C") != ptr[-1]["pointer"]:
+        out.append("the learned C is not C's last exported pointer")
+    hold = {r["arm"]: r["version"] for r in _read_gz_jsonl(d / "eval" / "hold-arms.jsonl.gz")}
+    if hold != (lb.get("holds") or {}):
+        out.append("the hold arms are not the learned hold states")
+    held = held_passing(_read_gz_jsonl(d / "C" / "audit.jsonl.gz"))
+    if {f"{HOLD_ARM}{k}": v for k, v in held.items()} != (lb.get("holds") or {}):
+        out.append("the learned hold states are not C's held confirmations")
+    if sealed_files(man) != ([f"sealed/C_hold.s{i}.seal" for i in range(n)]
+                             if lb.get("holds") else []):
+        out.append("the sealed files are not exactly one per shard")
+    traj_arms = [k for k, _ in lb["trajectory"]]
+    for i in range(n):
+        sd = d / "shards" / f"s{i}"
+        mf = sd / "MANIFEST.json"
+        if not mf.exists() or sha_file(mf) != sh["exports"].get(str(i)):
+            out.append(f"shard {i}: its manifest is missing or not the merged one")
+            continue
+        want = {f"hep:{c}" for c in shard_cases(units, n, i)}
+        rows = _read_gz_jsonl(sd / "eval" / "primary.jsonl.gz")
+        for a in ARMS:
+            us = [r["unit"] for r in rows if r["arm"] == a]
+            if len(us) != len(set(us)) or set(us) != want:
+                out.append(f"shard {i}: arm {a} does not have exactly its own units once")
+        twant = {f"hep:{c}" for c in shard_cases(traj_units, n, i)}
+        trows = _read_gz_jsonl(sd / "eval" / "trajectory.jsonl.gz")
+        if {r["arm"] for r in trows} - set(traj_arms):
+            out.append(f"shard {i}: trajectory rows of arms not in the learned states")
+        for a in traj_arms:  # every learned checkpoint, even one with no row here
+            us = [r["unit"] for r in trows if r["arm"] == a]
+            if len(us) != len(set(us)) or set(us) != twant:
+                out.append(f"shard {i}: trajectory arm {a} does not have exactly its units")
+    return out
 
 
 # ============================================================================ C_hold: blind decisions
@@ -1939,11 +2471,12 @@ def unseal(export_dir: Path, decisions_dir: Path, out: Path, *,
         raise RefusedError(f"unseal needs the attestation: {BLIND_ATTESTATION}")
     d, out = Path(export_dir), Path(out)
     man = json.loads((d / "MANIFEST.json").read_text())
-    sealed = d / "sealed" / "C_hold.seal"
-    if not sealed.exists():
+    sfiles = sealed_files(man)
+    if not sfiles:
         raise RefusedError("this export has no sealed C_hold outcomes")
-    if sha_file(sealed) != man["files"].get("sealed/C_hold.seal"):
-        raise RefusedError("the sealed file differs from the export manifest")
+    for f in sfiles:
+        if not (d / f).exists() or sha_file(d / f) != man["files"].get(f):
+            raise RefusedError(f"the sealed file {f} differs from the export manifest")
     _no_extracted_eval(d)
     decisions = hold_decisions(d, decisions_dir)
     keys = hold_keys(d)
@@ -1954,7 +2487,7 @@ def unseal(export_dir: Path, decisions_dir: Path, out: Path, *,
               "c_audit_head_sha256": audit[-1]["sha256"] if audit else None,
               "hold_keys": {str(k): keys[k] for k in sorted(decisions)},
               "export_manifest_sha256": sha_file(d / "MANIFEST.json"),
-              "sealed_sha256": man["files"]["sealed/C_hold.seal"],
+              "sealed_sha256": sealed_digest(man),
               "attestation": BLIND_ATTESTATION,
               "decisions": {str(k): v for k, v in sorted(decisions.items())}}
     commit["commitment_sha256"] = _sha(_canon(commit))
@@ -1969,7 +2502,13 @@ def unseal(export_dir: Path, decisions_dir: Path, out: Path, *,
                                        "decision: the committed decision stands")
     if not any(r.get("commitment_sha256") == commit["commitment_sha256"] for r in prior):
         reg.append(dict(commit))  # COMMITTED before any byte is decrypted
-    data = json.loads(SEAL.unseal(sealed.read_bytes(), SEAL.load_or_create(Path(key))))
+    priv = SEAL.load_or_create(Path(key))
+    parts = [json.loads(SEAL.unseal((d / f).read_bytes(), priv)) for f in sfiles]
+    if any(_canon(p_.get("hold_arms")) != _canon(parts[0].get("hold_arms")) for p_ in parts):
+        raise RefusedError("the shards' sealed C_hold arms differ")
+    data = {"hold_arms": parts[0].get("hold_arms"), "dialogues": parts[0].get("dialogues"),
+            **{n: [r for p_ in parts for r in p_.get(n) or []]
+               for n in ("primary-hold", "primary-hold-review", "hold-incidents")}}
     arms = sorted(r["arm"] for r in _read_gz_jsonl(d / "eval" / "hold-arms.jsonl.gz"))
     if sorted(r["arm"] for r in data.get("hold_arms") or []) != arms or \
             arms != sorted(f"{HOLD_ARM}{k}" for k in decisions):
@@ -2111,7 +2650,7 @@ def _c_hold_rows(export: Path, unsealed: Path | None, registry_dir: Path | None
     """The unsealed C_hold rows and the COMMITTED decisions; refuses while C_hold arms are
     sealed, or when the unsealed folder is not the committed unseal of this export."""
     man = json.loads((export / "MANIFEST.json").read_text())
-    if "sealed/C_hold.seal" not in man["files"]:
+    if not sealed_files(man):
         return [], None
     if unsealed is None:
         raise RefusedError("this block's C_hold outcomes are sealed: decide every hold "
@@ -2119,7 +2658,7 @@ def _c_hold_rows(export: Path, unsealed: Path | None, registry_dir: Path | None
     commit = json.loads((unsealed / "commitment.json").read_text())
     body = {k: v for k, v in commit.items() if k != "commitment_sha256"}
     if _sha(_canon(body)) != commit.get("commitment_sha256") or \
-            commit.get("sealed_sha256") != man["files"]["sealed/C_hold.seal"]:
+            commit.get("sealed_sha256") != sealed_digest(man):
         raise RefusedError(f"{unsealed}: not the committed unseal of {export}")
     if registry_dir is not None:
         from slh.learner.registry import Registry
@@ -2257,10 +2796,37 @@ def _host(args: argparse.Namespace) -> Any:
     return HermesHost(**kw)
 
 
+def _shard_identity(pkg: Package, mode: str, shards: int, shard: int | None
+                    ) -> dict[str, Any]:
+    """(v2.5) What a sharded run adds to the identity; nothing when N = 1 (unchanged)."""
+    if shards <= 1:
+        return {}
+    out: dict[str, Any] = {"shards": shards, "shard": shard,
+                           "role": "learn" if shard is None else "eval"}
+    if shard is not None:
+        sizes = pkg.sizes(mode != "full")
+        out["shard_cases_sha256"] = _sha("\n".join(shard_cases(
+            pkg.eval_units[:sizes.eval_units], shards, shard)))
+        if (pkg.plan.get("seal") or {}).get("public_key"):
+            out["seal_padded_bytes"] = shard_seal_padded(sizes, pkg.eval_units, shards)
+        from slh.system.hosts.hermes import probe as PR
+
+        pplan = PR.load_plan(pkg.root)
+        if pplan:
+            out["probe_budget"] = shard_probe_budget(pplan, shards, mode != "full")
+    return out
+
+
 def _identity(pkg: Package, block: str, mode: str, eps: Mapping[str, Endpoint] | None,
-              host: Any) -> dict[str, Any]:
+              host: Any, shards: int = 1, shard: int | None = None) -> dict[str, Any]:
     from slh.system.hosts.hermes import sandbox as SB
 
+    return {**_identity_base(pkg, block, mode, eps, host, SB),
+            **_shard_identity(pkg, mode, shards, shard)}
+
+
+def _identity_base(pkg: Package, block: str, mode: str, eps: Mapping[str, Endpoint] | None,
+                   host: Any, SB: Any) -> dict[str, Any]:
     return {"plan_sha256": pkg.plan["sha256"], "package_sha256": pkg.manifest["sha256"],
             "code_sha256": pkg.manifest["code_sha256"], "block": block, "mode": mode,
             "seal_public_key": (pkg.plan.get("seal") or {}).get("public_key"),
@@ -2368,6 +2934,14 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
             def health() -> bool:
                 return endpoint_alive(ae) and endpoint_alive(ce)
         mode = "dry" if dry else ("smoke" if smoke else "full")
+        shards = int(getattr(args, "shards", 1) or 1)
+        shard = getattr(args, "shard", None)
+        if not 1 <= shards <= MAX_SHARDS:
+            raise RefusedError(f"--shards must be 1..{MAX_SHARDS}")
+        if mode == "smoke" and shards > 1:
+            raise RefusedError("the smoke run is one node: run it without --shards")
+        if shard is not None and not (shards > 1 and 0 <= shard < shards):
+            raise RefusedError(f"--shard must be 0..{shards - 1} with --shards {shards} > 1")
         if mode == "full":
             require_smoke_pass(Path(args.smoke_run or f"runs/mh1-{block}-smoke"), pkg, block,
                                eps)
@@ -2378,7 +2952,18 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
             probes = {"agent": probe_endpoint(eps["agent"], structured=False),
                       f"customer {block}": probe_endpoint(eps[block], structured=True)}
             print(json.dumps({"serving_probes": probes}, indent=1))
-        _open_run(out, _identity(pkg, block, mode, eps, host))
+        ident = _identity(pkg, block, mode, eps, host, shards, shard)
+        if shard is not None:
+            if not getattr(args, "learned", None):
+                raise RefusedError("an eval shard needs --learned <the learning run folder>")
+            src = Path(args.learned)
+            src = src / LEARNED_DIR if (src / LEARNED_DIR / "learned.json").exists() else src
+            # the learning node's identity, as the eval shard's must match it
+            want = {**ident, "role": "learn", "shard": None}
+            ident["learned_sha256"] = _learned_body(src)["sha256"]
+        _open_run(out, ident)
+        if shard is not None:
+            copy_learned(src, out, want)
         (out / "preflight.json").write_text(json.dumps(
             {"sandbox": SB.backend_report(), "hermes": host.identity(),
              "time": time.time()}, indent=1, default=str))
@@ -2393,9 +2978,11 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
         from slh.system.hosts.hermes import probe as PR
 
         chooser = PR.PromptedChooser(agent.base_url, agent.name, seed=limits.agent_seed)
+        default_stages = ("B", "C", "eval", "trajectory", "probe") if shards <= 1 else (
+            ("C", "B", "probe") if shard is None else ("eval", "trajectory", "probe"))
         run = BlockRun(pkg, block, out, pad, prop, sizes,
                        stages=tuple(args.stages.split(",")) if args.stages else
-                       ("B", "C", "eval", "trajectory", "probe"),
+                       default_stages, shards=shards, shard=shard,
                        probe_plan=PR.load_plan(pkg.root), probe_chooser=chooser,
                        probe_smoke=mode != "full",
                        probe_require=(Path(args.smoke_run or f"runs/mh1-{block}-smoke")
@@ -2410,7 +2997,10 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
             (out / "smoke.json").write_text(json.dumps(sm, indent=1, sort_keys=True))
             rep["smoke"] = sm
             print(json.dumps({"smoke": sm}, indent=1))
-            if not sm["passed"]:
+            # (v2.5) a sharded CPU dry run checks plumbing only: one node's share may hold
+            # no eval unit, so its smoke report is recorded, not a gate (the smoke run
+            # itself is always one node)
+            if not sm["passed"] and shards <= 1:
                 raise RefusedError(f"smoke run did not pass: {sm['reasons']}")
         (out / "done.json").write_text(json.dumps(rep, indent=1))
         (out / "halt.json").unlink(missing_ok=True)
@@ -2470,6 +3060,13 @@ def smoke_report(out: Path, pkg: Package, *, workers: int, probes: Mapping[str, 
                 reasons.append(f"serving probe {k}: {v.get('problems')}")
         if not probes:
             reasons.append("no serving probes")
+    answered: dict[str, int] = {}
+    tp = out / "C" / "system" / "traces.jsonl"
+    for counts in [r.get("hermes_answered") or {} for r in rows] + [
+            answered_counts(t.get("trace") or {}) for t in (Jsonl(tp).rows()
+                                                             if tp.exists() else [])]:
+        for k, v in counts.items():
+            answered[k] = answered.get(k, 0) + int(v)
     secs = [float(r["seconds"]) for r in rows if r.get("seconds")]
     mean_s = sum(secs) / len(secs) if secs else None
     lo, hi = episode_counts(pkg.sizes(False))["per_block"]
@@ -2480,6 +3077,9 @@ def smoke_report(out: Path, pkg: Package, *, workers: int, probes: Mapping[str, 
                              "valid_rate": round(1 - bad_acts / acts, 4) if acts else None},
             "probes": probes, "mean_episode_seconds": round(mean_s, 1) if mean_s else None,
             "workers": workers, "projection_full_block_hours": proj,
+            # (v2.3) tool calls Hermes answered itself (no hook, nothing executed), by the
+            # Hermes path (design s. 19); a halt still fails the smoke (exit 5)
+            "hermes_answered_without_execution": answered,
             # the S1 headroom probe (report only: it never fails the M-H1 smoke gate; its
             # prefix-replay fidelity gates the FULL probe of this block)
             "probe": (json.loads((out / "probe" / "status.json").read_text())
@@ -2573,6 +3173,17 @@ def main(argv: list[str] | None = None) -> int:
         r.add_argument("--work-root")
         r.add_argument("--workers", type=int, default=4 if name == "dry-run" else 64)
         r.add_argument("--stages")
+        if name in ("run", "dry-run"):
+            # (v2.5) multi-node (design s. 21): N = --shards; no --shard = the learning
+            # node (B, C; then it writes <out>/learned); --shard I = eval shard I, which
+            # reads the learning run's states from --learned
+            r.add_argument("--shards", type=int, default=1,
+                           help=f"number of nodes N (1..{MAX_SHARDS}; 1 = one node, as "
+                                "before)")
+            r.add_argument("--shard", type=int, default=None,
+                           help="this eval shard's index (0..N-1); omit on the learning node")
+            r.add_argument("--learned", default=None,
+                           help="eval shards: the learning run's folder (or its learned/)")
         if name in ("run", "preflight"):
             r.add_argument("--endpoint", default="endpoint-mh1.yaml")
             r.add_argument("--block", choices=sorted(CUSTOMERS), required=name == "run")
@@ -2589,6 +3200,12 @@ def main(argv: list[str] | None = None) -> int:
     e = sub.add_parser("export")
     e.add_argument("--run", type=Path, required=True)
     e.add_argument("--out", type=Path, required=True)
+    ms = sub.add_parser("merge-shards", help="ours: one multi-node block's exports -> one "
+                                             "merged export (bytes only; blind-safe)")
+    ms.add_argument("--learn", type=Path, required=True)
+    ms.add_argument("--shard", type=Path, nargs="+", required=True)
+    ms.add_argument("--package", type=Path, required=True)
+    ms.add_argument("--out", type=Path, required=True)
     v = sub.add_parser("verify")
     v.add_argument("--package", type=Path, required=True)
     v.add_argument("--export", type=Path, nargs="+", required=True)
@@ -2674,6 +3291,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "export":
         print(json.dumps(export(args.run, args.out), indent=1))
+        return 0
+    if args.cmd == "merge-shards":
+        try:
+            print(json.dumps(merge_exports(args.learn, args.shard, args.out,
+                                           Package.load(args.package, check_code=False)),
+                             indent=1))
+        except RefusedError as ex:
+            print(json.dumps({"ok": False, "error": str(ex)}))
+            return 4
         return 0
     if args.cmd == "verify":
         pkg = Package.load(args.package, check_code=False)
