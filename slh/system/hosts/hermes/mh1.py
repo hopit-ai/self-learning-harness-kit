@@ -74,7 +74,7 @@ from typing import Any
 from slh.system.hosts.hermes.errors import HaltError, IncidentError, RefusedError
 
 PLAN_SCHEMA = "slh-mh1-plan-v1"
-PLAN_ID = "mh1-2026-10-25-v2.5"  # v2.5: multi-node (s. 21); v2.4 s. 20; v2.3 s. 19
+PLAN_ID = "mh1-2026-10-25-v2.6"  # v2.6: guard stall (s. 22); v2.5 s. 21; v2.4 s. 20
 PACKAGE_SCHEMA = "slh-mh1-package-v1"
 EXPORT_SCHEMA = "slh-mh1-export-v1"
 REPO = Path(__file__).resolve().parents[4]
@@ -1095,6 +1095,8 @@ def outcome_row(arm: str, o: Any, d: Mapping[str, Any], *, stage: str) -> dict[s
             "killed": d.get("killed"), "writes": d.get("writes") or [],
             # (v2.3) calls Hermes answered itself without the hook or any execution
             "hermes_answered": answered_counts(tr),
+            # (v2.6) the slowest guard round trip of the episode (seconds)
+            "guard_max_s": (tr.get("guard_latency") or {}).get("max_s"),
             **act_counts(d.get("dialogue")),
             "usage": {k: v for k, v in (tr.get("usage") or {}).items()
                       if isinstance(v, (int, float))}}
@@ -2952,6 +2954,11 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
             probes = {"agent": probe_endpoint(eps["agent"], structured=False),
                       f"customer {block}": probe_endpoint(eps[block], structured=True)}
             print(json.dumps({"serving_probes": probes}, indent=1))
+        guard_load = None
+        if mode in ("smoke", "dry"):  # (v2.6) the full run's concurrency, before it starts
+            guard_load = guard_load_check(pkg, args.workers, work_root=Path(
+                args.work_root or os.environ.get("SLH_EPISODE_TMP", "/tmp")))
+            print(json.dumps({"guard_load": guard_load}, indent=1))
         ident = _identity(pkg, block, mode, eps, host, shards, shard)
         if shard is not None:
             if not getattr(args, "learned", None):
@@ -2993,7 +3000,8 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
             if stub is not None:
                 stub.stop()
         if smoke:
-            sm = smoke_report(out, pkg, workers=args.workers, probes=probes, dry=dry)
+            sm = smoke_report(out, pkg, workers=args.workers, probes=probes, dry=dry,
+                              guard_load=guard_load)
             (out / "smoke.json").write_text(json.dumps(sm, indent=1, sort_keys=True))
             rep["smoke"] = sm
             print(json.dumps({"smoke": sm}, indent=1))
@@ -3022,12 +3030,94 @@ def _cmd_run(args: argparse.Namespace, *, dry: bool = False) -> int:
         return 4
 
 
+GUARD_LOAD_MAX_S = 10.0  # smoke gate: slowest guard round trip under full-concurrency load
+
+
+def guard_load_check(pkg: Package, workers: int, *, requests: int = 40,
+                     work_root: Path | None = None) -> dict[str, Any]:
+    """(v2.6) The partner's c27b learning halt came from the harness process stalling with
+    ``workers`` conversations in it (full garbage collections over every live database copy,
+    each holding the GIL for seconds) until Hermes' guard-hook timeout fired. The smoke run's
+    own dispatches are small, so this check recreates the full-run load in this process:
+    ``workers`` live database copies built concurrently (as a full dispatch does), with
+    garbage collections forced meanwhile, while a real bridge (Unix socket, broker, guard
+    chain) answers ``requests`` guard requests sent as the plugin sends them. Reports the
+    slowest round trip; the smoke fails if it exceeds GUARD_LOAD_MAX_S."""
+    import gc
+    import socket
+    import tempfile
+    from concurrent.futures import ThreadPoolExecutor
+
+    from slh.system.hosts.hermes.bridge import BridgeServer, Broker
+
+    pkg.register_db()
+    surf = _surface_cls()(pkg.pool(), None, retail_db=pkg.plan["retail_db"],
+                          heldout=pkg.heldout_users)
+    class _NoSession:
+        def position(self) -> int:
+            return 0
+
+    broker = Broker(_NoSession(), role="evidence", task_tools=set(surf.task_tools),
+                    surface_guard=surf.surface_guard, expected_materialization="load-check")
+    d = Path(tempfile.mkdtemp(prefix="slh-gl-", dir=str(work_root or "/tmp")))
+    server = BridgeServer(d / "b.sock", broker).start()
+    keep: list[Any] = []
+    lat: list[float] = []
+    stop = threading.Event()
+
+    def collector() -> None:  # what the interpreter does on its own under allocation
+        while not stop.is_set():
+            gc.collect()
+            stop.wait(0.2)
+
+    def ask(i: int) -> None:
+        msg = {"op": "guard", "tool": "get_order_details", "args": {"order_id": f"#W{i}"},
+               "call_id": f"load-{i}", "origin": "foreground", "t_sent": time.time()}
+        t0 = time.time()
+        c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        c.settimeout(120)
+        try:
+            c.connect(server.path)
+            c.sendall((json.dumps(msg) + "\n").encode())
+            buf = b""
+            while not buf.endswith(b"\n"):
+                chunk = c.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+        finally:
+            c.close()
+        lat.append(time.time() - t0)
+
+    gct = threading.Thread(target=collector, daemon=True)
+    gct.start()
+    t0 = time.time()
+    try:
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+            builds = [ex.submit(lambda: keep.append(surf._env())) for _ in range(workers)]
+            for i in range(requests):
+                ask(i)
+                time.sleep(0.05)
+            for f in builds:
+                f.result()
+    finally:
+        stop.set()
+        server.stop()
+        keep.clear()
+    return {"workers": workers, "requests": len(lat),
+            "max_s": round(max(lat), 3) if lat else None,
+            "p50_s": round(sorted(lat)[len(lat) // 2], 3) if lat else None,
+            "seconds": round(time.time() - t0, 1), "limit_s": GUARD_LOAD_MAX_S,
+            "ok": bool(lat) and max(lat) <= GUARD_LOAD_MAX_S}
+
+
 SMOKE_MAX_NONSCORED = 0.05
 SMOKE_MAX_INVALID_ACTS = 0.01
 
 
 def smoke_report(out: Path, pkg: Package, *, workers: int, probes: Mapping[str, Any] | None,
-                 dry: bool = False) -> dict[str, Any]:
+                 dry: bool = False, guard_load: Mapping[str, Any] | None = None
+                 ) -> dict[str, Any]:
     """Label and serving health of a smoke run, and the full-run projection.
 
     Passes only if: scored episodes exist; unscored + error <= 5 %; customer turns without
@@ -3060,6 +3150,10 @@ def smoke_report(out: Path, pkg: Package, *, workers: int, probes: Mapping[str, 
                 reasons.append(f"serving probe {k}: {v.get('problems')}")
         if not probes:
             reasons.append("no serving probes")
+    if guard_load is not None and not guard_load.get("ok"):
+        reasons.append(f"guard round trip under {guard_load.get('workers')}-conversation load "
+                       f"{guard_load.get('max_s')} s > {GUARD_LOAD_MAX_S} s")
+    gl_rows = [r.get("guard_max_s") for r in rows if r.get("guard_max_s") is not None]
     answered: dict[str, int] = {}
     tp = out / "C" / "system" / "traces.jsonl"
     for counts in [r.get("hermes_answered") or {} for r in rows] + [
@@ -3080,6 +3174,9 @@ def smoke_report(out: Path, pkg: Package, *, workers: int, probes: Mapping[str, 
             # (v2.3) tool calls Hermes answered itself (no hook, nothing executed), by the
             # Hermes path (design s. 19); a halt still fails the smoke (exit 5)
             "hermes_answered_without_execution": answered,
+            # (v2.6) the guard under the full run's concurrency, and in these episodes
+            "guard_load": guard_load,
+            "guard_max_s_in_episodes": max(gl_rows) if gl_rows else None,
             # the S1 headroom probe (report only: it never fails the M-H1 smoke gate; its
             # prefix-replay fidelity gates the FULL probe of this block)
             "probe": (json.loads((out / "probe" / "status.json").read_text())

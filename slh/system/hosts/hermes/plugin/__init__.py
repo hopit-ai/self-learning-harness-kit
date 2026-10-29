@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import time
 
 TOOLSET = "slh_task"
 COERCE_MAX_PASSES = 5
@@ -117,7 +118,7 @@ def on_pre_tool_call(tool_name, args, tool_call_id="", **kw):
                      "call_id": str(tool_call_id or ""), "origin": _origin(),
                      "task_id": str(kw.get("task_id") or ""),
                      "session_id": str(kw.get("session_id") or ""),
-                     "coerced": final != raw})
+                     "coerced": final != raw, "t_sent": time.time()})
     action = reply.get("action")
     if action == "allow":
         # Hermes' modify merges these keys over the raw ones (the same key set): it then

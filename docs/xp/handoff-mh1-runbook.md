@@ -1,8 +1,16 @@
 # Hand-off M-H1 runbook: Hermes Agent on the retail benchmark, three arms, two customer models
 
-**Version 2.5** (kit tag `mh1-2026-10-25-v2.5`, plan `mh1-2026-10-25-v2.5`). New in 2.5:
-each block can run on several nodes (section 3b); with one node nothing changes. It
-replaces versions 2.4 and earlier. Fixed in 2.4: the cause of the exit 5 in the 2.1/2.2 smoke runs: when the
+**Version 2.6** (kit tag `mh1-2026-10-25-v2.6`, plan `mh1-2026-10-25-v2.6`). Fixed in 2.6:
+the exit 5 in the `c27b` learning of your 2.5 run. With 64 conversations in one process,
+Python's memory clean-up walked every conversation's copy of the retail database and froze
+the process for tens of seconds, so our tool-call check answered Hermes later than its 30 s
+limit; Hermes then refused that call and skipped our check for a minute, and the run stopped
+(nothing ran without approval). Now all conversations share one copy of the database and each keeps only
+the records it changes, Hermes waits up to 300 s for the check, a refusal Hermes makes after
+such a timeout is recorded instead of stopping the run, and the smoke run first tests the
+check under the full worker count (it fails if one answer takes over 10 s). Everything else
+is as in 2.5. New in 2.5: each block can run on several nodes (section 3b); with one node
+nothing changes. It replaces versions 2.5 and earlier. Fixed in 2.4: the cause of the exit 5 in the 2.1/2.2 smoke runs: when the
 model edits an existing memory note in the after-conversation review, Hermes takes a lock
 on a small file next to the memory file; the sandbox keeps that folder read-only, the edit
 failed, and Hermes answered every other call of that turn with an error without passing
@@ -295,6 +303,10 @@ L=$(sbatch --parsable -N1 --gres=gpu:8 node.sh learn $B $N)
 sbatch -N1 --gres=gpu:8 --array=0-$((N-1)) --dependency=afterok:$L node.sh shard $B $N
 # in node.sh: shard I = $SLURM_ARRAY_TASK_ID
 ```
+
+Launch ONE Slurm step per node (one `sbatch` job per node, as above, each running its own
+commands inside; or one `srun` per node from inside an allocation), not many steps from the
+login node: many concurrent steps can exhaust the login node's ports.
 
 If the learning job stops (exit 3) and you resubmit it, the pending eval array still waits
 on the OLD job id and will never start: cancel it and submit the array again with

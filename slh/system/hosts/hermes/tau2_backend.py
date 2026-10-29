@@ -707,6 +707,17 @@ class Tau2Session:
         if hasattr(self.customer, "begin_episode"):
             self.customer.begin_episode()
         self._base = float(getattr(self.customer, "last_cost_usd", 0.0) or 0.0)
+        from slh.xp import retaildb
+
+        # (v2.6) attempts to change the process's shared read-only database, at the start
+        self.shared_db_attempts = retaildb.shared_change_attempts()
+
+    def shared_db_changed(self) -> int:
+        """Attempts to change the shared database since this episode started (process-wide:
+        any attempt is a fault of the harness or a tool; every episode then reports it)."""
+        from slh.xp import retaildb
+
+        return retaildb.shared_change_attempts() - self.shared_db_attempts
 
     def _charge(self) -> None:
         self.cost_usd = float(getattr(self.customer, "last_cost_usd", 0.0) or 0.0) - self._base

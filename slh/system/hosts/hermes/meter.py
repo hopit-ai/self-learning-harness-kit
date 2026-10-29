@@ -199,6 +199,9 @@ class SpendGate:
     def stop(self) -> None:
         self._httpd.shutdown()
         self._httpd.server_close()
+        # (v2.6) break gate -> server -> Handler class (closure over the gate) -> gate, so a
+        # finished episode's gate is freed by reference counting, not left to the collector
+        self._httpd.RequestHandlerClass = None
 
 
 def _usage(raw: bytes) -> dict[str, Any] | None:

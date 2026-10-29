@@ -1,6 +1,6 @@
-# Plain runbook: environment and servers (plan mh1-2026-10-25-v2.5)
+# Plain runbook: environment and servers (plan mh1-2026-10-25-v2.6)
 
-Code snapshot `947747514d3f97c9aa3508ff179dcdc052e4a8b3`. This kit runs no phase 1 and ships no phase-1
+Code snapshot `14c5d014a90c69a127653b86619f05c7ddfa1a31`. This kit runs no phase 1 and ships no phase-1
 package: the release's runbook (see README.md) names the packages and commands to run.
 Sections 1 and 2 below are the environment and the server settings it refers to.
 

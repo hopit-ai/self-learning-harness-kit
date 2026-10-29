@@ -23,6 +23,7 @@ import json
 import os
 import socket
 import threading
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -64,6 +65,11 @@ class Broker:
         self.on_hello = on_hello
         self.lock = threading.Lock()
         self.turn_lock = threading.Lock()  # serialises dialogue ops (never held with ``lock``)
+        # (v2.6) one entry per guard REQUEST the moment it arrives (before any lock), with
+        # the plugin's send time and, once decided, the decision time: a Hermes hook timeout
+        # is then attributable to the harness (arrival late, decision slow) or not
+        self.guard_entries: list[dict[str, Any]] = []
+        self._entry_lock = threading.Lock()
         self.mediation: list[dict[str, Any]] = []
         self.executed: list[dict[str, Any]] = []
         self.unmediated: list[dict[str, Any]] = []
@@ -81,9 +87,19 @@ class Broker:
         op = msg.get("op")
         if op in ("first_user", "user_turn"):
             return self._turn(op, msg)
+        entry = None
+        if op == "guard":
+            entry = {"call_id": str(msg.get("call_id") or ""), "tool": str(msg.get("tool")),
+                     "origin": str(msg.get("origin") or "unknown"),
+                     "t_sent": msg.get("t_sent"), "t_in": time.time(), "t_out": None}
+            with self._entry_lock:
+                self.guard_entries.append(entry)
         with self.lock:
             if op == "guard":
-                return self._guard(msg)
+                try:
+                    return self._guard(msg)
+                finally:
+                    entry["t_out"] = time.time()
             if op == "tool":
                 return self._tool(msg)
             if op == "hello":

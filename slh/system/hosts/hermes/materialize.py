@@ -47,6 +47,7 @@ MANIFEST = ".slh/manifest.json"
 # writable here, outside the manifest; the sandbox re-allows exactly these files; the
 # post-run check requires them to be empty regular files.
 LOCK_FILES = ("memories/MEMORY.md.lock", "memories/USER.md.lock")
+HOOK_CALLBACK_TIMEOUT_S = 300
 LOCK_MODE = 0o600
 FILE_MODE = 0o444
 DIR_MODE = 0o555
@@ -77,7 +78,11 @@ def host_config(*, memory_char_limit: int = 2200,
         "auxiliary": {"background_review": {"enabled": True, "defer": "never"}},
         "curator": {"enabled": False},
         "tools": {"tool_search": {"enabled": "off"}, "connectors": {"enabled": False}},
-        "plugins": {"enabled": [PLUGIN_NAME]},
+        # (v2.6) Hermes' wall-clock cap on one pre_tool_call callback (our guard round
+        # trip): default 30 s, max 600 s; a timeout blocks the call and suppresses the hook
+        # for 60 s (fail closed). 300 s: far above any healthy guard decision (milliseconds),
+        # below the episode's wall clock.
+        "plugins": {"enabled": [PLUGIN_NAME], "hook_callback_timeout": HOOK_CALLBACK_TIMEOUT_S},
     }
     for k, v in (extra or {}).items():
         cfg[k] = v
