@@ -42,6 +42,7 @@ packages = [
     "slh.xp.consent",
     "slh.xp.fgate",
     "slh.xp.learn",
+    "slh.xp.ourside",
     "slh.xp.partner",
     "slh.xp.partner_c",
     "slh.xp.phase2",

@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "14c5d014a90c69a127653b86619f05c7ddfa1a31",
-  "tree": "5b5a05f3b4a09f8dadda21829b106b82e3329d5e"
+  "commit": "32e53223b6cdc86dba4c3c0298811db60cf19e6f",
+  "tree": "9d29a230be5f13ff66c69a2b1aa539db5a05354d"
  },
  "files": {
   ".gitignore": {
@@ -22,22 +22,22 @@
   "README-plain.md": {
    "bytes": 5558,
    "mode": "644",
-   "sha256": "db30b25130e3443af114abd355162580940aa0cd794cfa0eb770bf7b68b3be93"
+   "sha256": "17554f84a2fc333c7af427cf38212a3b2102baf2b4161bf5a14d75efa25b2325"
   },
   "README.md": {
-   "bytes": 2207,
+   "bytes": 2211,
    "mode": "644",
-   "sha256": "52cb256105f060f70dc1bbc4c7b5cf5fc68c5135a5740f4bb92d9c2318250886"
+   "sha256": "8c478ff5fdf454b4dc0ea7d2dbd2e57c38c30e0c33107f8e0f2abb3ebb1e3a5f"
   },
   "docs/xp/handoff-mh1-runbook.md": {
-   "bytes": 21409,
+   "bytes": 22522,
    "mode": "644",
-   "sha256": "ea1e4dbf450f839c24402a22f546a8d403f6b8f5fbe56bea4be233277930ab04"
+   "sha256": "9c727d9dd1654b8155673e123863e557e4f7e95facb810a2db114f3fb30ee2c3"
   },
   "pyproject.toml": {
-   "bytes": 1574,
+   "bytes": 1596,
    "mode": "644",
-   "sha256": "e72fded78c3ba0de661fcc35093998391ffd6e630ff033db86e2bd1df205f75f"
+   "sha256": "95ef7fe29a084e786264469410b03f4047398e28bffc5c80fbf08e66068f3e56"
   },
   "scripts/xp/hermes_pip_check.py": {
    "bytes": 5545,
@@ -444,6 +444,11 @@
    "mode": "644",
    "sha256": "16113d6b2b0a22bf386918e68548b417bef27ffe64350f34d7c056940db03ff2"
   },
+  "slh/system/hosts/hermes/mh1_text.py": {
+   "bytes": 27436,
+   "mode": "644",
+   "sha256": "79eda4cc2ae3f13ff56955a72fba22162b5294e2ce1223fe8d01767e0b34cfaa"
+  },
   "slh/system/hosts/hermes/plugin/__init__.py": {
    "bytes": 6543,
    "mode": "644",
@@ -624,6 +629,16 @@
    "mode": "644",
    "sha256": "618c4339e6182749179b6494c9162bbbefd35f6b1e262ce32191ffef34ddb587"
   },
+  "slh/xp/ourside/__init__.py": {
+   "bytes": 80,
+   "mode": "644",
+   "sha256": "4311fcc903bf385e260b851914c77c98bf983d1f152ee8cd47ef0473dc18d1e2"
+  },
+  "slh/xp/ourside/s1_probe_ourside.py": {
+   "bytes": 62822,
+   "mode": "644",
+   "sha256": "ccc7cb1d52f91958da65e1bb3a303dc240f73de317d5d998e315fa4ca3384496"
+  },
   "slh/xp/partner/__init__.py": {
    "bytes": 101,
    "mode": "644",
@@ -795,13 +810,13 @@
   "rehearsal": false,
   "runbook": "docs/xp/handoff-mh1-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "mh1-2026-10-25-v2.6"
+  "tag": "mh1-2026-10-25-v2.6.1"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "mh1-2026-10-25-v2.6"
+  "phase1": "mh1-2026-10-25-v2.6.1"
  },
- "total_bytes": 2846000,
+ "total_bytes": 2937477,
  "variant": "plain"
 }

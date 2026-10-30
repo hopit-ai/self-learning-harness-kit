@@ -1,6 +1,8 @@
 # Hand-off M-H1 runbook: Hermes Agent on the retail benchmark, three arms, two customer models
 
-**Version 2.6** (kit tag `mh1-2026-10-25-v2.6`, plan `mh1-2026-10-25-v2.6`). Fixed in 2.6:
+**Version 2.6** (kit tag `mh1-2026-10-25-v2.6`, plan `mh1-2026-10-25-v2.6`; the follow-up
+tag `mh1-2026-10-25-v2.6.1` adds only the text-report tool of section 4, the run is
+unchanged). Fixed in 2.6:
 the exit 5 in the `c27b` learning of your 2.5 run. With 64 conversations in one process,
 Python's memory clean-up walked every conversation's copy of the retail database and froze
 the process for tens of seconds, so our tool-call check answered Hermes later than its 30 s
@@ -357,33 +359,49 @@ sharding can add. If a shard stops with exit 3, fix the cause and rerun that sha
 command (only that array index); never rerun learning to resume a shard. For exit 4 or 5,
 stop every job of the block, export and pack what exists, and tell us.
 
-## 4. Export and send back (CPU)
+## 4. Report back as TEXT (version 2.6.1; no files are sent)
 
-Stop the servers, then:
+Do not pack or send any file. Stop the servers, export every run folder (CPU), then make
+two short text reports with the kit's report tool (tag `mh1-2026-10-25-v2.6.1`: the v2.6
+kit plus this tool; the run and its data package are exactly v2.6's, so a run made with
+the v2.6 kit is reported the same way):
 
 ```bash
 for R in mh1-c9b mh1-c27b mh1-c9b-smoke mh1-c27b-smoke; do
   $PY -m slh.system.hosts.hermes.mh1 export --run runs/$R --out export-$R
 done
-scripts/xp/pack_export.sh handoff-mh1 export-mh1-c9b export-mh1-c27b \
-  export-mh1-c9b-smoke export-mh1-c27b-smoke export-mh1-dry \
-  setup-hermes.log preflight-sandbox.log preflight-cpu.log preflight-c9b.log preflight-c27b.log dry-run.log \
-  run-c9b-smoke.log run-c27b-smoke.log run-c9b.log run-c27b.log \
-  server-9b.log server-27b.log endpoint-mh1.yaml
+# multi-node (section 3b): export the learning folder and every shard folder too, and
+# give all of a block's exports, comma separated, to --block below
+$PY -m slh.system.hosts.hermes.mh1_text part1 --package package-mh1 \
+  --block c9b=export-mh1-c9b --block c27b=export-mh1-c27b \
+  --smoke c9b=export-mh1-c9b-smoke --smoke c27b=export-mh1-c27b-smoke > report-part1.txt
 ```
 
-Expected size: 8–15 MB in at most two 10 MB parts; it must stay **under 20 MB**. Export
-keeps each block within its budget by itself (it shortens dialogue text only), and
-`pack_export.sh` packs each log over 200 KB as its last 200 KB. Export works on an
-unfinished run too (it marks the export incomplete), so after an exit 4 or 5 export and
-pack the same way. If `pack_export.sh` refuses (20 MB or more), do not send anything: tell
-us the size of each folder (`du -sh export-* *.log`) and we will say what to do; do not
-drop files.
+1. Paste `report-part1.txt` into a message to us, exactly as printed (under one page; it
+   ends with a `CHECK part1 ...` line that lets us detect copying errors). It holds the run
+   identity, completion and timing, our integrity checks, the smoke summary and the
+   learned changes that wait for our review, but no results.
+2. **Wait for our reply.** We review the held changes and send back one decisions line,
+   for example `c9b:k1=reject c27b:k2=approve` (or `none`), and the CHECK value of your
+   part 1.
+3. Then run, with exactly that line and value:
 
-Send every `handoff-mh1.tar.gz.part-*` and `handoff-mh1.sha256`, plus a short note:
-wall-clock time per block, GPU type and count, any halts, stops or exit codes. Keep the
-`runs/` folders for 30 days.
+```bash
+$PY -m slh.system.hosts.hermes.mh1_text part2 --package package-mh1 \
+  --block c9b=export-mh1-c9b --block c27b=export-mh1-c27b \
+  --decisions "<the line we sent>" --part1-check <the value we sent> > report-part2.txt
+```
+
+4. Paste `report-part2.txt` (under two pages, ends with `CHECK part2 ...`). It holds the
+   pre-registered analysis and the probe summary; it takes a few minutes to compute.
+
+After an exit 4 or 5, export what exists and make part 1 the same way (it reports the
+stop); paste it and wait for us. Add a short note: wall-clock time per block, GPU type and
+count, any halts, stops or exit codes. **Keep the `runs/` and `export-*` folders for at
+least 60 days**: we may ask for one more number from them later.
 
 ## What happens next (our side)
 
-We verify the checksums and the run identity, then run the pre-registered analysis.
+We check each pasted part's CHECK line and its identity line, decide the held changes from
+part 1 alone, record those decisions before asking for part 2, and read the pre-registered
+analysis from part 2.
