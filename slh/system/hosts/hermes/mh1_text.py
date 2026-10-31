@@ -479,6 +479,55 @@ def _cal(c: Mapping[str, Any]) -> str:
         for r in ("control", "selector"))
 
 
+def _numeric(digest: Any) -> bool:
+    """A call digest that JSON reads as a number (all digits, or ``<digits>e<digits>``,
+    which overflows to inf): the frozen cost code (``probe_cost.call_fingerprint``)
+    json-parses string arguments, so such a digest became a float and ``canonical_bytes``
+    refused inf (the partner's v2.6.2 part 3 crash)."""
+    if not isinstance(digest, str):
+        return False
+    try:
+        json.loads(digest)
+    except ValueError:
+        return False
+    return True
+
+
+def safe_branch_row(r: Mapping[str, Any]) -> dict[str, Any]:
+    """(v2.6.3, analysis path only) A branch row whose call lists the frozen cost code can
+    fingerprint: every digest prefixed ``h:`` (never valid JSON, so it is hashed as the
+    string it is; equal digests stay equal, so re-calls of removed calls still match) and
+    an empty tool name read as ``tool`` (what the continuation side already does). On rows
+    without numeric-looking digests the cost is unchanged (tested)."""
+    out = dict(r)
+    for k in ("cont_calls", "removed_calls"):
+        if isinstance(r.get(k), list):
+            out[k] = [[str(c[0] or "tool"), f"h:{c[1]}"] if isinstance(c, (list, tuple))
+                      and len(c) == 2 else c for c in r[k]]
+    return out
+
+
+def _safe_copy(exports: Sequence[Path], work: Path) -> list[Path]:
+    """The probe parts of the exports, copied with ``safe_branch_row`` applied (the input
+    folders are never written)."""
+    out = []
+    for i, e in enumerate(exports):
+        e, d = Path(e), work / f"safe{i}"
+        (d / "probe").mkdir(parents=True)
+        if (e / "MANIFEST.json").exists():
+            shutil.copy(e / "MANIFEST.json", d / "MANIFEST.json")
+        for f in (e / "probe").iterdir():
+            if f.name == "branches.jsonl.gz":
+                rows = _gz_rows(f)
+                data = "".join(json.dumps(safe_branch_row(r), sort_keys=True) + "\n"
+                               for r in rows).encode()
+                (d / "probe" / f.name).write_bytes(gzip.compress(data, mtime=0))
+            elif f.is_file():
+                shutil.copy(f, d / "probe" / f.name)
+        out.append(d)
+    return out
+
+
 def _probe_lines(exports: Sequence[Path], package: Path) -> list[str]:
     from slh.xp.ourside import s1_probe_ourside as SO
 
@@ -486,6 +535,7 @@ def _probe_lines(exports: Sequence[Path], package: Path) -> list[str]:
     if not exports:
         return ["S1 PROBE: no probe part in these exports"]
     with tempfile.TemporaryDirectory() as td:
+        exports = _safe_copy(exports, Path(td))
         cal = SO.calibrate(exports, package)  # pool C only (prereg s. 7)
         p = Path(td) / "calibration.json"
         p.write_text(json.dumps(cal, indent=1, sort_keys=True, default=str))

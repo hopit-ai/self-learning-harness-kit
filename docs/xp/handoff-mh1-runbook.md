@@ -404,7 +404,7 @@ least 60 days**: we may ask for one more number from them later.
 
 The `c9b` probe ran, but its rows did not fit the byte share an export file allows, so the
 exports left them out (the run folders still hold them). With text there is no such limit.
-With the kit tag `mh1-2026-10-25-v2.6.2` (the same run code as v2.6), on the node(s) that
+With the kit tag `mh1-2026-10-25-v2.6.3` (the same run code as v2.6; v2.6.2 crashed on some rows), on the node(s) that
 hold the `runs/` folders (CPU only, a few minutes, no servers needed):
 
 ```bash
