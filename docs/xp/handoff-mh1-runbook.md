@@ -400,6 +400,25 @@ stop); paste it and wait for us. Add a short note: wall-clock time per block, GP
 count, any halts, stops or exit codes. **Keep the `runs/` and `export-*` folders for at
 least 60 days**: we may ask for one more number from them later.
 
+### 4b. Part 3: the probe from the run folders (version 2.6.2)
+
+The `c9b` probe ran, but its rows did not fit the byte share an export file allows, so the
+exports left them out (the run folders still hold them). With text there is no such limit.
+With the kit tag `mh1-2026-10-25-v2.6.2` (the same run code as v2.6), on the node(s) that
+hold the `runs/` folders (CPU only, a few minutes, no servers needed):
+
+```bash
+# one node per block:  --run c9b=runs/mh1-c9b
+# several nodes:       every run folder of the block, the learning one first
+$PY -m slh.system.hosts.hermes.mh1_text probe --package package-mh1 \
+  --run c9b=runs/mh1-c9b,runs/mh1-c9b-s0,runs/mh1-c9b-s1 \
+  --smoke-run c9b=runs/mh1-c9b-smoke > report-part3.txt
+```
+
+Paste `report-part3.txt` (about one page, ends with `CHECK part3 ...`). It needs no
+decision from us and reads no evaluation result. The decisions line may be `none` (or empty)
+when no change waits for review.
+
 ## What happens next (our side)
 
 We check each pasted part's CHECK line and its identity line, decide the held changes from

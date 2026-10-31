@@ -32,6 +32,13 @@ degraded flags, tokens, and the S1 probe headroom summary (``s1_probe_ourside``:
 on pool C, then the report: oracle envelope, matched-real minus placebo, both calibration
 rules, the null-ladder rung, the review-skip rule statistics).
 
+Part 3 (v2.6.2; ``probe``, about one page, no decision needed): the S1 probe from the RUN
+folders, because an export drops the probe rows when they exceed its byte share (it writes
+``probe/over_budget.json``; the v2.6.1 c9b return lost them this way). Per node: what the
+probe did (ran / skipped and why / error / rows over the share), its rows on disk, then the
+same analysis as part 2 on every row (a text return has no byte share). Part 1 now also
+names each node's probe outcome.
+
 Each part ends with ``CHECK partN <16 hex>``: the SHA-256 of every line above it (trailing
 spaces stripped), so a pasted copy can be checked for transcription errors (``check``).
 """
@@ -223,6 +230,49 @@ def _smoke_line(s: Path | None) -> str:
             f" | incidents {len(inc)}")
 
 
+def _status_word(st: Mapping[str, Any] | None, err: Any, over: Any) -> str:
+    """One node's probe outcome in a few words (status.json, error.json, the export's
+    over_budget.json): ran / skipped (why) / error / rows over the byte share."""
+    bits = []
+    st = st or {}
+    if st.get("skipped"):
+        f = st.get("smoke_fidelity") or {}
+        bits.append(f"SKIPPED ({_clip(st['skipped'], 60)}; smoke branches {f.get('branches')}"
+                    f" diverged {f.get('diverged')})")
+    elif st:
+        f = st.get("fidelity") or {}
+        d = st.get("decisions") or {}
+        bits.append(f"ran: base {st.get('base')} decisions t1 {d.get('1')} t3 {d.get('3')} "
+                    f"branches {f.get('branches')} diverged {f.get('diverged')}"
+                    + (f" parts {','.join(st['parts'])}" if st.get("parts") else ""))
+        b = st.get("bytes") or {}
+        if b.get("over_budget"):
+            bits.append(f"ROWS OVER BYTE SHARE ({_clip(b['over_budget'], 70)})")
+    else:
+        bits.append("no status")
+    if err:
+        e = err.get("error") if isinstance(err, Mapping) else err
+        bits.append(f"ERROR {_clip(str(e).strip().splitlines()[-1] if e else '?', 90)}")
+    if over:
+        bits.append("export: rows DROPPED (over_budget.json)")
+    return " | ".join(bits)
+
+
+def _export_probe_line(e: Path) -> str | None:
+    """(v2.6.2) What the probe did on every node of a block, from the export: the learning
+    node's (or the one node's) probe/status.json and each shard's under shards/s<i>/."""
+    nodes = [("", e)] + sorted((d.name, d) for d in (e / "shards").glob("s*")
+                               if d.is_dir()) if (e / "shards").exists() else [("", e)]
+    out = []
+    for name, d in nodes:
+        st, err, over = (_gz(d / "probe" / f"{n}.json.gz")
+                         for n in ("status", "error", "over_budget"))
+        if st is None and err is None and over is None:
+            continue
+        out.append(f"{name or 'node'} {_status_word(st, err, over)}")
+    return ("probe: " + " ;; ".join(out)) if out else None
+
+
 def _gz_rows(p: Path) -> list[dict[str, Any]]:
     from slh.system.hosts.hermes import mh1 as M
 
@@ -331,6 +381,9 @@ def part1(package: Path, blocks: Mapping[str, Sequence[Path]],
                         f"{v['probe']['bad']}")
             for p in v["problems"][:3]:
                 body.append(f"  problem: {_clip(p, 110)}")
+            pl = _export_probe_line(e)
+            if pl:
+                body.append(" " + pl)
             body.append(" " + _smoke_line((smokes or {}).get(b)))
             hs = holds(e)
             req = [h for h in hs if h["required"]]
@@ -355,7 +408,11 @@ def part1(package: Path, blocks: Mapping[str, Sequence[Path]],
 
 
 def _decisions(spec: str) -> dict[tuple[str, int], str]:
-    out = {}
+    """``BLOCK:kN=approve|reject`` tokens; empty or ``none`` (the runbook's word when no
+    hold needs a decision) is no decision (v2.6.2)."""
+    out: dict[tuple[str, int], str] = {}
+    if (spec or "").strip().lower() in ("", "none"):
+        return out
     for tok in spec.split():
         b, _, rest = tok.partition(":")
         k, _, d = rest.partition("=")
@@ -363,6 +420,11 @@ def _decisions(spec: str) -> dict[tuple[str, int], str]:
             raise SystemExit(f"bad decision {tok!r}: use BLOCK:kN=approve|reject")
         out[(b, int(k[1:]))] = d
     return out
+
+
+def _dec_string(dec: Mapping[tuple[str, int], str]) -> str:
+    """The decisions as the header prints them (and our record stores them)."""
+    return " ".join(f"{b}:k{k}={d}" for (b, k), d in sorted(dec.items())) or "none"
 
 
 def _arm_line(rows: Sequence[Mapping[str, Any]], arm: str, label: str) -> str:
@@ -480,7 +542,7 @@ def part2(package: Path, blocks: Mapping[str, Sequence[Path]], decisions: str,
     try:
         body = [(f"M-H1 TEXT PART 2 ({TEXT_SCHEMA}) plan {pkg.plan['plan_id']} package "
                  f"{pkg.manifest['sha256'][:16]} | {tool_hashes()} | part1 "
-                 f"{part1_check or 'not given'} | decisions {decisions or 'none'}"),
+                 f"{part1_check or 'not given'} | decisions {_dec_string(dec)}"),
                 "(no sealed C_hold file: C including an approved hold is NOT computable here)"]
         pvals: dict[str, float] = {}
         per_block: dict[str, list[tuple[str, dict[str, Any]]]] = {}
@@ -544,6 +606,104 @@ def part2(package: Path, blocks: Mapping[str, Sequence[Path]], decisions: str,
         shutil.rmtree(work, ignore_errors=True)
 
 
+# ----------------------------------------------------------------------------- part 3
+
+
+UNCAPPED = 10 ** 12  # text return: the export's byte share does not apply
+
+
+def _run_ident(d: Path) -> dict[str, Any]:
+    p = Path(d) / "run.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
+def _rows_on_disk(d: Path) -> tuple[dict[str, int], str]:
+    """Row counts of a node's probe logs and one hash over them (they stay in the run
+    folder whatever the export did)."""
+    h = hashlib.sha256()
+    n = {}
+    for name in ("base", "decisions", "branches", "review-prompted"):
+        f = Path(d) / "probe" / f"{name}.jsonl"
+        raw = f.read_bytes() if f.exists() else b""
+        h.update(name.encode() + b"\0" + raw + b"\0")
+        n[name] = sum(1 for x in raw.splitlines() if x.strip())
+    return n, h.hexdigest()[:12]
+
+
+def part3(package: Path, runs: Mapping[str, Sequence[Path]],
+          smoke_runs: Mapping[str, Path] | None = None) -> str:
+    """(v2.6.2) The S1 probe from the RUN folders (not the exports): what the probe did on
+    every node (ran / skipped and why / error / rows over the export's byte share), the
+    rows on disk, and, when there are rows, the same frozen analysis as part 2 on ALL of
+    them (the export's byte share is a file-return limit; a text return has none). No
+    M-H1 outcome is read: probe rows and the learning node's review rows only."""
+    from slh.system.hosts.hermes import mh1 as M
+    from slh.system.hosts.hermes import probe as PR
+
+    pkg = M.Package.load(Path(package), check_code=False)
+    work = Path(tempfile.mkdtemp(prefix="mh1-text-"))
+    try:
+        body = [(f"M-H1 TEXT PART 3 PROBE ({TEXT_SCHEMA}) plan {pkg.plan['plan_id']} package "
+                 f"{pkg.manifest['sha256'][:16]} | {tool_hashes()}")]
+        dirs: list[Path] = []
+        has_rows = False
+        for b in sorted(runs):
+            body.append(f"BLOCK {b}: {len(runs[b])} run folder(s)")
+            sm = (smoke_runs or {}).get(b)
+            if sm is not None:
+                st = _run_probe_status(Path(sm))
+                body.append(f" smoke {Path(sm).name}: {_status_word(*st)}")
+            for d in runs[b]:
+                d = Path(d)
+                ident = _run_ident(d)
+                bad = [k for k, want in (("plan_sha256", pkg.manifest["plan_sha256"]),
+                                         ("package_sha256", pkg.manifest["sha256"]),
+                                         ("code_sha256", pkg.manifest["code_sha256"]))
+                       if ident.get(k) != want]
+                if ident.get("probe_plan_sha256") not in (
+                        None, pkg.manifest.get("probe_plan_sha256")):
+                    bad.append("probe_plan_sha256")
+                role = ident.get("role") or "one node"
+                sh = ident.get("shard")
+                name = role if sh is None else f"{role} {sh}/{ident.get('shards')}"
+                n, hx = _rows_on_disk(d)
+                body.append(f" {d.name} ({name}{'; IDENTITY DIFFERS ' + ','.join(bad) if bad else ''})"
+                            f" done {'yes' if (d / 'done.json').exists() else 'no'} | "
+                            f"{_status_word(*_run_probe_status(d))}")
+                body.append(f"   rows on disk: base {n['base']} decisions {n['decisions']} "
+                            f"branches {n['branches']} review-prompted {n['review-prompted']}"
+                            f" | sha {hx}")
+                if bad:
+                    continue
+                out = work / f"n{len(dirs)}"
+                for f, data in PR.export_rows(d, UNCAPPED).items():
+                    q = out / f"{f}.gz"
+                    q.parent.mkdir(parents=True, exist_ok=True)
+                    q.write_bytes(gzip.compress(data, mtime=0))
+                    if f.endswith(".jsonl") and data.strip():
+                        has_rows = True
+                dirs.append(out)
+        if has_rows:
+            body.append("ANALYSIS on every row above (uncapped; the frozen analysis of part 2):")
+            body += _probe_lines(dirs, Path(package))
+        else:
+            body.append("ANALYSIS: no probe rows in these run folders")
+        return _seal(body, "part3")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _run_probe_status(d: Path) -> tuple[Any, Any, Any]:
+    """A run folder's probe status.json and error.json (and no export flag)."""
+    def rd(n: str) -> Any:
+        f = Path(d) / "probe" / n
+        try:
+            return json.loads(f.read_text()) if f.exists() else None
+        except ValueError:
+            return {"error": f"unreadable {n}"}
+    return rd("status.json"), rd("error.json"), None
+
+
 # ----------------------------------------------------------------------------- CLI
 
 
@@ -561,6 +721,11 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--decisions", default="",
                            help='"c9b:k1=approve c27b:k2=reject" (from us, after part 1)')
             p.add_argument("--part1-check", default=None)
+    p3 = sub.add_parser("probe", help="(v2.6.2) part 3: the S1 probe from the RUN folders")
+    p3.add_argument("--package", type=Path, default=Path("package-mh1"))
+    p3.add_argument("--run", action="append", default=[], required=True,
+                    help="BLOCK=RUN[,RUN...] (every node's run folder of a block)")
+    p3.add_argument("--smoke-run", action="append", default=[], help="BLOCK=SMOKE_RUN")
     c = sub.add_parser("check", help="ours: recompute the CHECK line of a pasted part")
     c.add_argument("--text", type=Path, required=True)
     a = ap.parse_args(argv)
@@ -569,6 +734,9 @@ def main(argv: list[str] | None = None) -> int:
                                {b: ds[0] for b, ds in _blocks(a.smoke).items()}))
     elif a.cmd == "part2":
         sys.stdout.write(part2(a.package, _blocks(a.block), a.decisions, a.part1_check))
+    elif a.cmd == "probe":
+        sys.stdout.write(part3(a.package, _blocks(a.run),
+                               {b: ds[0] for b, ds in _blocks(a.smoke_run).items()}))
     else:
         r = check_text(a.text.read_text())
         print(json.dumps(r))

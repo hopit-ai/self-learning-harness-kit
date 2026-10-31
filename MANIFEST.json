@@ -1,7 +1,7 @@
 {
  "code_snapshot": {
-  "commit": "32e53223b6cdc86dba4c3c0298811db60cf19e6f",
-  "tree": "9d29a230be5f13ff66c69a2b1aa539db5a05354d"
+  "commit": "387cabe26e2c2976050359c103e280b308d635be",
+  "tree": "a5b325cbd7a7cf7bb545d9b28c566b8dd3dd529a"
  },
  "files": {
   ".gitignore": {
@@ -22,17 +22,17 @@
   "README-plain.md": {
    "bytes": 5558,
    "mode": "644",
-   "sha256": "17554f84a2fc333c7af427cf38212a3b2102baf2b4161bf5a14d75efa25b2325"
+   "sha256": "f1d48e7b2aeb244e87a453d500b14842a937578babaf8949d7164fc9462b3ba6"
   },
   "README.md": {
    "bytes": 2211,
    "mode": "644",
-   "sha256": "8c478ff5fdf454b4dc0ea7d2dbd2e57c38c30e0c33107f8e0f2abb3ebb1e3a5f"
+   "sha256": "322204a827b2edcd13ab9a0c81232fd310070788b326ced2b739a8a20794750c"
   },
   "docs/xp/handoff-mh1-runbook.md": {
-   "bytes": 22522,
+   "bytes": 23462,
    "mode": "644",
-   "sha256": "9c727d9dd1654b8155673e123863e557e4f7e95facb810a2db114f3fb30ee2c3"
+   "sha256": "528840a559b215d816e02c9a1d2c9c116e34de6332fd47dd436ffb17893f8bb7"
   },
   "pyproject.toml": {
    "bytes": 1596,
@@ -445,9 +445,9 @@
    "sha256": "16113d6b2b0a22bf386918e68548b417bef27ffe64350f34d7c056940db03ff2"
   },
   "slh/system/hosts/hermes/mh1_text.py": {
-   "bytes": 27436,
+   "bytes": 35819,
    "mode": "644",
-   "sha256": "79eda4cc2ae3f13ff56955a72fba22162b5294e2ce1223fe8d01767e0b34cfaa"
+   "sha256": "19089f432b28e7cfeaeefd71fd41c7fd865a8be67ae52bb51b69b1077d806ae8"
   },
   "slh/system/hosts/hermes/plugin/__init__.py": {
    "bytes": 6543,
@@ -810,13 +810,13 @@
   "rehearsal": false,
   "runbook": "docs/xp/handoff-mh1-runbook.md",
   "schema": "xp-handoff-release-v1",
-  "tag": "mh1-2026-10-25-v2.6.1"
+  "tag": "mh1-2026-10-25-v2.6.2"
  },
  "schema": "xp-public-kit-v1",
  "slurm_blobs": {},
  "tags": {
-  "phase1": "mh1-2026-10-25-v2.6.1"
+  "phase1": "mh1-2026-10-25-v2.6.2"
  },
- "total_bytes": 2937477,
+ "total_bytes": 2946800,
  "variant": "plain"
 }
